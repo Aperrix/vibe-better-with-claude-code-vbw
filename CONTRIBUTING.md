@@ -44,7 +44,7 @@ All `/vbw:*` commands will load from your local copy. Restart Claude Code to pic
 
 > **Important:** `--plugin-dir` loads whatever is on disk in your VBW clone, which means whatever branch is currently checked out. Make sure you're on the branch with your changes before launching Claude Code — if you're on `main`, you'll be testing the unchanged version.
 
-> **Known limitation:** Plugin hooks (the 20 event handlers in `hooks.json`) resolve scripts from the marketplace cache (`~/.claude/plugins/cache/...`), not from `--plugin-dir`. In local dev mode the cache is empty, so **all plugin hooks are no-ops** — security filters, QA gates, commit validation, session-start migration, etc. will not run. Commands and agents load correctly; only plugin hooks are affected. Keep this in mind when testing hook-dependent features. (The git pre-push hook is a separate mechanism — see [Version Management](#version-management).)
+> **Known limitation:** Plugin hooks (the 21 event handlers in `hooks.json`) resolve scripts from the marketplace cache (`~/.claude/plugins/cache/...`), not from `--plugin-dir`. In local dev mode the cache is empty, so **all plugin hooks are no-ops** — security filters, QA gates, commit validation, session-start migration, etc. will not run. Commands and agents load correctly; only plugin hooks are affected. Keep this in mind when testing hook-dependent features. (The git pre-push hook is a separate mechanism — see [Version Management](#version-management).)
 
 ## Project Structure
 
@@ -103,6 +103,8 @@ Less good candidates:
 5. Test your changes against at least one real project (not the VBW repo itself).
 6. **Run QA review before marking ready.** Repeat this cycle at least 2–4 times:
 
+   > **Docs-only or trivial PRs:** The QA round requirement only applies when the PR touches plugin logic paths (`agents/`, `commands/`, `config/`, `hooks/`, `references/`, `scripts/`, `templates/`, `testing/`, `tests/`). PRs that only change docs, CI config, or repo metadata skip the check automatically.
+
    **Step A — Run the QA prompt.** Open a **new** Claude Code (or other AI) session using a top-tier model — **Claude Opus 4.6**, **GPT-5.3 Codex high/xhigh**, or **Gemini 3.1 Pro**. Smaller models (Haiku, Sonnet, etc.) don't produce thorough enough reviews. Paste the prompt below (fill in the placeholders):
 
    ````text
@@ -137,8 +139,13 @@ Less good candidates:
 When you're done testing your local changes, re-install the marketplace version:
 
 ```bash
-# Inside a Claude Code session (without --plugin-dir)
+# Start Claude Code normally (without --plugin-dir)
 claude
+```
+
+Then inside the Claude Code session:
+
+```text
 /plugin marketplace add yidakee/vibe-better-with-claude-code-vbw
 /plugin install vbw@vbw-marketplace
 ```
@@ -186,7 +193,13 @@ git push
 
 The hook only blocks pushes if the 4 version files have mismatched values. Use `git push --no-verify` to bypass in rare cases.
 
-The pre-push hook is auto-installed by `/vbw:init` when running the marketplace version. In local dev mode (via `--plugin-dir`), plugin hooks are no-ops so auto-install won't trigger — run `bash scripts/install-hooks.sh` manually to install the git pre-push hook.
+The pre-push hook is auto-installed by `/vbw:init` when running the marketplace version. In local dev mode (via `--plugin-dir`), plugin hooks are no-ops so auto-install won't trigger. You can still verify version consistency manually:
+
+```bash
+bash scripts/bump-version.sh --verify
+```
+
+> **Note:** The git pre-push hook installed by `scripts/install-hooks.sh` delegates to the marketplace cache, which is empty in local dev mode. The hook will silently pass without checking. Use the manual `--verify` command above before pushing if you've touched version files.
 
 ## Reporting Bugs
 
