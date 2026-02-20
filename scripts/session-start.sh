@@ -35,7 +35,7 @@ fi
 
 # Auto-migrate config if .vbw-planning exists.
 # Version marker retained here for backwards test compatibility.
-EXPECTED_FLAG_COUNT=23
+EXPECTED_FLAG_COUNT=32
 if [ -d "$PLANNING_DIR" ] && [ -f "$PLANNING_DIR/config.json" ]; then
   if ! bash "$SCRIPT_DIR/migrate-config.sh" "$PLANNING_DIR/config.json" >/dev/null 2>&1; then
     echo "WARNING: Config migration failed (jq error). Config may be missing flags (expected=$EXPECTED_FLAG_COUNT)." >&2
@@ -98,10 +98,23 @@ if [ -d "$PLANNING_DIR" ] && [ ! -f "$PLANNING_DIR/.todo-flat-migrated" ]; then
   fi
 fi
 
+# --- Remove stale ACTIVE file (one-time, architecture simplification) ---
+# ACTIVE milestone indirection has been removed. Root paths are canonical.
+# Delete any leftover ACTIVE file so nothing reads it.
+if [ -d "$PLANNING_DIR" ] && [ -f "$PLANNING_DIR/ACTIVE" ]; then
+  rm -f "$PLANNING_DIR/ACTIVE" 2>/dev/null || true
+fi
+
+# --- Rename milestones/default/ to meaningful slug (one-time) ---
+# Old archive created milestones/default/. Rename to descriptive slug.
+if [ -d "$PLANNING_DIR/milestones/default" ] && [ -f "$SCRIPT_DIR/rename-default-milestone.sh" ]; then
+  bash "$SCRIPT_DIR/rename-default-milestone.sh" "$PLANNING_DIR" 2>/dev/null || true
+fi
+
 # --- Migrate orphaned STATE.md for brownfield post-ship repos (one-time) ---
 # If a project shipped a milestone before this fix, STATE.md lives only in
 # milestones/{slug}/ with no root copy. Recover project-level sections.
-if [ -d "$PLANNING_DIR" ] && [ ! -f "$PLANNING_DIR/STATE.md" ] && [ ! -f "$PLANNING_DIR/ACTIVE" ]; then
+if [ -d "$PLANNING_DIR" ] && [ ! -f "$PLANNING_DIR/STATE.md" ]; then
   bash "$SCRIPT_DIR/migrate-orphaned-state.sh" "$PLANNING_DIR" 2>/dev/null || true
 fi
 
@@ -116,48 +129,15 @@ if [ -d "$PLANNING_DIR" ] && [ -f "$PLANNING_DIR/config.json" ] && command -v jq
     "VBW_AUTONOMY=\(.autonomy // "standard")",
     "VBW_PLANNING_TRACKING=\(.planning_tracking // "manual")",
     "VBW_AUTO_PUSH=\(.auto_push // "never")",
-    "VBW_CONTEXT_COMPILER=\(if .context_compiler == null then true else .context_compiler end)",
-    "VBW_V3_DELTA_CONTEXT=\(.v3_delta_context // false)",
-    "VBW_V3_CONTEXT_CACHE=\(.v3_context_cache // false)",
-    "VBW_V3_PLAN_RESEARCH_PERSIST=\(.v3_plan_research_persist // false)",
-    "VBW_V3_METRICS=\(.v3_metrics // false)",
-    "VBW_V3_CONTRACT_LITE=\(.v3_contract_lite // false)",
-    "VBW_V3_LOCK_LITE=\(.v3_lock_lite // false)",
-    "VBW_V3_VALIDATION_GATES=\(.v3_validation_gates // false)",
-    "VBW_V3_SMART_ROUTING=\(.v3_smart_routing // false)",
-    "VBW_V3_EVENT_LOG=\(.v3_event_log // false)",
-    "VBW_V3_SCHEMA_VALIDATION=\(.v3_schema_validation // false)",
-    "VBW_V3_SNAPSHOT_RESUME=\(.v3_snapshot_resume // false)",
-    "VBW_V3_LEASE_LOCKS=\(.v3_lease_locks // false)",
-    "VBW_V3_EVENT_RECOVERY=\(.v3_event_recovery // false)",
-    "VBW_V3_MONOREPO_ROUTING=\(.v3_monorepo_routing // false)",
-    "VBW_V2_HARD_CONTRACTS=\(.v2_hard_contracts // false)",
-    "VBW_V2_HARD_GATES=\(.v2_hard_gates // false)",
-    "VBW_V2_TYPED_PROTOCOL=\(.v2_typed_protocol // false)",
-    "VBW_V2_ROLE_ISOLATION=\(.v2_role_isolation // false)",
-    "VBW_V2_TWO_PHASE_COMPLETION=\(.v2_two_phase_completion // false)",
-    "VBW_V2_TOKEN_BUDGETS=\(.v2_token_budgets // false)"
+    "VBW_CONTEXT_COMPILER=\(if .context_compiler == null then true else .context_compiler end)"
   ' "$PLANNING_DIR/config.json" > "$VBW_CONFIG_CACHE" 2>/dev/null || true
 fi
 
 # --- Flag dependency validation (REQ-01) ---
 FLAG_WARNINGS=""
 if [ -d "$PLANNING_DIR" ] && [ -f "$PLANNING_DIR/config.json" ]; then
-  _v2_hard_gates=$(jq -r '.v2_hard_gates // false' "$PLANNING_DIR/config.json" 2>/dev/null)
-  _v2_hard_contracts=$(jq -r '.v2_hard_contracts // false' "$PLANNING_DIR/config.json" 2>/dev/null)
-  _v3_event_recovery=$(jq -r '.v3_event_recovery // false' "$PLANNING_DIR/config.json" 2>/dev/null)
-  _v3_event_log=$(jq -r '.v3_event_log // false' "$PLANNING_DIR/config.json" 2>/dev/null)
-  _v2_two_phase=$(jq -r '.v2_two_phase_completion // false' "$PLANNING_DIR/config.json" 2>/dev/null)
-
-  if [ "$_v2_hard_gates" = "true" ] && [ "$_v2_hard_contracts" != "true" ]; then
-    FLAG_WARNINGS="${FLAG_WARNINGS} WARNING: v2_hard_gates requires v2_hard_contracts -- enable v2_hard_contracts first or contract_compliance gate will fail."
-  fi
-  if [ "$_v3_event_recovery" = "true" ] && [ "$_v3_event_log" != "true" ]; then
-    FLAG_WARNINGS="${FLAG_WARNINGS} WARNING: v3_event_recovery requires v3_event_log -- enable v3_event_log first or event recovery will find no events."
-  fi
-  if [ "$_v2_two_phase" = "true" ] && [ "$_v3_event_log" != "true" ]; then
-    FLAG_WARNINGS="${FLAG_WARNINGS} WARNING: v2_two_phase_completion requires v3_event_log -- enable v3_event_log first or completion events will be lost."
-  fi
+  # v2_hard_gates/v2_hard_contracts dependency removed - both are now always-on
+  true
 fi
 
 # Compaction marker cleanup moved to the early-exit check above and to post-compact.sh
@@ -437,6 +417,12 @@ if [ -d "$PLANNING_DIR" ] && [ -f "$SCRIPT_DIR/clean-stale-teams.sh" ]; then
   bash "$SCRIPT_DIR/clean-stale-teams.sh" 2>/dev/null || true
 fi
 
+# --- Stale .agent-last-words Cleanup ---
+# Remove crash recovery files older than 7 days to prevent accumulation
+if [ -d "$PLANNING_DIR/.agent-last-words" ]; then
+  find "$PLANNING_DIR/.agent-last-words" -name "*.txt" -type f -mtime +7 -delete 2>/dev/null || true
+fi
+
 # --- tmux Detach Watchdog ---
 # Launch watchdog when in tmux to cleanup orphaned agents on detach.
 # Watchdog runs in background and monitors for session detachment.
@@ -481,22 +467,16 @@ if [ ! -d "$PLANNING_DIR" ]; then
   exit 0
 fi
 
-# --- Resolve ACTIVE milestone ---
-MILESTONE_SLUG="none"
-if [ -f "$PLANNING_DIR/ACTIVE" ]; then
-  MILESTONE_SLUG=$(cat "$PLANNING_DIR/ACTIVE" 2>/dev/null | tr -d '[:space:]')
-  MILESTONE_DIR="$PLANNING_DIR/milestones/$MILESTONE_SLUG"
-  if [ ! -d "$MILESTONE_DIR" ]; then
-    # ACTIVE points to nonexistent directory — fall back
-    MILESTONE_SLUG="none"
-    MILESTONE_DIR="$PLANNING_DIR"
-    PHASES_DIR="$PLANNING_DIR/phases"
-  else
-    PHASES_DIR="$MILESTONE_DIR/phases"
-  fi
-else
-  MILESTONE_DIR="$PLANNING_DIR"
-  PHASES_DIR="$PLANNING_DIR/phases"
+# --- Root-canonical paths (no ACTIVE indirection) ---
+MILESTONE_DIR="$PLANNING_DIR"
+PHASES_DIR="$PLANNING_DIR/phases"
+
+# --- Shipped milestones detection ---
+has_shipped="false"
+if [ -d "$PLANNING_DIR/milestones" ]; then
+  for _ms in "$PLANNING_DIR"/milestones/*/; do
+    [ -f "${_ms}SHIPPED.md" ] && has_shipped="true" && break
+  done
 fi
 
 # --- Parse config ---
@@ -557,7 +537,12 @@ NEXT_ACTION=""
 if [ ! -f "$PLANNING_DIR/PROJECT.md" ]; then
   NEXT_ACTION="/vbw:init"
 elif [ ! -d "$PHASES_DIR" ] || [ -z "$(ls -d "$PHASES_DIR"/*/ 2>/dev/null)" ]; then
-  NEXT_ACTION="/vbw:vibe (needs scoping)"
+  # No root phases — check if milestones were shipped (post-archive state)
+  if [ "$has_shipped" = "true" ]; then
+    NEXT_ACTION="/vbw:vibe (all milestones shipped, start next milestone)"
+  else
+    NEXT_ACTION="/vbw:vibe (needs scoping)"
+  fi
 else
   # Check execution state for interrupted builds
   EXEC_STATE="$PLANNING_DIR/.execution-state.json"
@@ -607,7 +592,7 @@ fi
 
 # --- Build additionalContext ---
 CTX="VBW project detected."
-CTX="$CTX Milestone: ${MILESTONE_SLUG}."
+CTX="$CTX Shipped milestones: ${has_shipped}."
 CTX="$CTX Phase: ${phase_pos}/${phase_total} (${phase_name}) -- ${phase_status}."
 CTX="$CTX Progress: ${progress_pct}%."
 CTX="$CTX Config: effort=${config_effort}, autonomy=${config_autonomy}, auto_commit=${config_auto_commit}, planning_tracking=${config_planning_tracking}, auto_push=${config_auto_push}, verification=${config_verification}, prefer_teams=${config_prefer_teams}, max_tasks=${config_max_tasks}."

@@ -2,6 +2,59 @@
 
 All notable changes to VBW will be documented in this file.
 
+## [1.30.1] - 2026-02-20
+
+### Added
+
+- **`session-start`** -- Shipped milestones detection and QA verification script for post-ship validation.
+- **`context`** -- Pre-flight context guard to prevent mid-workflow compaction from disrupting agent execution.
+
+### Changed
+
+- **`milestone`** -- Removed ACTIVE-file milestone indirection. Slug derivation and decision/todo extraction enhanced in milestone scripts.
+- **`flags`** -- Partially reverted flag graduation — restored 9 flags as configurable. Legacy key fallback added to all consumer scripts. Runtime defaults aligned with legacy fallback behavior.
+- **`suggest-compact`** -- Replaced eval jq with safe direct assignment. Dynamic token cost from actual file sizes.
+- **`worktree`** -- Defaults to off. Fixed merge args, normalized boundary paths, added branch-exists fallback.
+
+### Fixed
+
+- **`crash-recovery`** -- Avoid false fallback and preserve last words when SUMMARY.md missing.
+- **`uat`** -- 4 rounds of QA fixes: pad normalization, orphan guard, mid-execution guard, numeric sort, sort -V portability, false remediation fallback.
+- **`vibe`** -- Hardened UAT remediation routing and chain enforcement. Auto-route UAT remediation from /vbw:vibe.
+- **`milestone`** -- Fixed rename-default-milestone slug derivation, post-ship state, collision guard, phases/ guard, generic tag strip, contract scope.
+- **`scripts`** -- Null-safe jq patterns for false-default booleans. Tightened artifact globs. Removed unused variables (SC2034). Removed unreachable exit in validate-contract.sh.
+- **`config`** -- Graduated v2_token_budgets. Stripped graduated V2/V3 flags from brownfield configs. Synced EXPECTED_FLAG_COUNT after worktree_isolation addition.
+- **`tests`** -- Updated 90+ tests for graduated flags and portable paths. Fixed BATS_TEST_TMPDIR usage. Updated rollout-stage counts.
+
+## [1.30.0] - 2026-02-19
+
+### Added
+
+- **`crash-recovery`** -- Agent crash recovery via `last_assistant_message` from CC 2.1.47 SubagentStop hook. `agent-stop.sh` captures agent final output to `.agent-last-words/` when SUMMARY.md missing. `validate-summary.sh` uses crash recovery files as fallback (60s freshness window). `session-start.sh` auto-cleans stale files (7-day TTL). Event log tracks `agent_shutdown` events with `last_message_length` metric.
+- **`bash-classifier-tests`** -- 55 new BATS tests validating all 26 VBW hook bash patterns against CC 2.1.47 stricter permission classifier. Tests cover hook-wrapper.sh resolution, individual script invocations, bash-guard.sh pattern matching, and end-to-end integration. All patterns confirmed classifier-safe with zero changes needed to hooks.json.
+- **`agent-memory`** -- Native `memory` frontmatter added to all 7 agents. Core agents (lead, dev, qa, debugger, architect) use `memory: project` for cross-session learning. Ephemeral agents (scout, docs) use `memory: local`.
+- **`agent-restrictions`** -- Native `Task(agent_type)` spawn restrictions added to all 7 agents. Lead can only spawn Dev. Debugger can only spawn Debugger (competing hypotheses). Dev, architect, docs cannot spawn agents. Scout and QA already lacked Task capability.
+- **`cc-version-table`** -- Claude Code version requirements table added to README with minimum versions for key features (hooks, teams, classifier, memory).
+- **`token-analysis`** -- v1.30.0 token analysis document covering CC Alignment + Worktree Isolation impact: 85 scripts, 57 test files, 825 BATS tests. Per-request +12% (enforcement content), 73% reduction vs stock teams.
+- **`worktree-isolation`** — Git worktree-per-plan isolation for Dev agents
+  (6 scripts, enabled by default via `worktree_isolation` config, set `"off"` to disable).
+
+### Changed
+
+- **`feature-flags`** -- Graduated 20 always-true feature flags (6 v2_*, 14 v3_*). Removed dead else-branches from 18+ scripts. Consolidated duplicate flags (`v3_lock_lite` → `v3_lease_locks`, `v3_contract_lite` → `v2_hard_contracts`). Graduated v3 observability flags (metrics, schema_validation, smart_routing, monorepo_routing, validation_gates, delta_context).
+- **`config`** -- `v2_token_budgets` now defaults to `false` in config/defaults.json. CC manages context natively.
+- **`compaction`** -- Plan mode compaction workaround removed (CC 2.1.47 handles natively). Instructions updated to clarify CC-native vs VBW-specific behavior.
+- **`update`** -- `/vbw:update` no longer displays restart requirement. Changes active immediately (CC 2.1.45+).
+- **`token-budgets`** -- Added inline documentation to config/token-budgets.json explaining budget sizing rationale (1-4% of agent context windows) and per-task complexity scaling (0.6x-1.6x multipliers).
+
+### Deprecated
+
+- **`file-guard`** -- `scripts/file-guard.sh` marked as worktree-deprecation candidate with header comment.
+
+### Removed
+
+- **`lock-lite`** — Deprecated script removed (replaced by lease-lock.sh).
+
 ## [1.21.31] - 2026-02-19
 
 ### Added
@@ -15,11 +68,16 @@ All notable changes to VBW will be documented in this file.
 
 - **`bootstrap`** -- Codebase mapping bootstrap across all agents now uses META.md gating and "whichever exist" qualification to avoid wasted tool calls. Compaction re-reads codebase files. (PR #99 by @dpearson2699)
 - **`bootstrap`** -- Key Decisions section removed from CLAUDE.md template. Existing decision rows migrated to STATE.md. Deprecated section handling added. (PR #93 by @dpearson2699)
+- **`requirements`** -- Added minimum Claude Code version table to README documenting CC 2.1.47+ requirement for agent teams model routing and plan mode native support.
 
 ### Fixed
 
 - **`help`** -- CLAUDE_CONFIG_DIR fallback added to backtick expansion in help.md for non-standard config paths. (PR #101 by @halindrome)
 - **`hooks`** -- Circuit breaker added to `task-verify.sh` preventing infinite loop when failed verification re-triggers itself. Expanded stop words in session-stop.sh. (PR #95 by @dpearson2699)
+
+### Compatibility
+
+- **Agent Teams Model Routing** -- Requires Claude Code >= 2.1.47. Earlier versions had silently broken model routing for team teammates, causing all agents to use the default model instead of role-specific model profiles. If you experience agents using incorrect models (e.g., all agents using Sonnet when configured for Opus/Haiku), upgrade to Claude Code 2.1.47 or later.
 
 ## [1.21.30] - 2026-02-17
 

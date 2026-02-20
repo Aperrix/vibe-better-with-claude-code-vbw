@@ -24,7 +24,7 @@ Config:
 !`cat .vbw-planning/config.json 2>/dev/null || echo "No config found"`
 ```
 
-!`bash ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}/scripts/suggest-compact.sh execute 2>/dev/null`
+!`bash ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}/scripts/suggest-compact.sh execute 2>/dev/null || true`
 
 ## Input Parsing
 
@@ -256,7 +256,7 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 **Steps:**
 1. **Parse args:** Phase number (optional, auto-detected), --effort (optional, falls back to config).
 2. **Phase context:** If `{phase-dir}/{phase}-CONTEXT.md` exists, include it in Lead agent context. If not, proceed without — users who want context run `/vbw:discuss N` first.
-3. **Research persistence (REQ-08):** If `v3_plan_research_persist=true` in config AND effort != turbo:
+3. **Research persistence (REQ-08, graduated):** If effort != turbo:
    - Check for `{phase-dir}/{phase}-RESEARCH.md`.
    - **If missing:** Spawn Scout agent to research the phase goal, requirements, and relevant codebase patterns. Scout returns structured findings with sections: `## Findings`, `## Relevant Patterns`, `## Risks`, `## Recommendations`. The **orchestrator** (not Scout) writes the returned findings to `{phase-dir}/{phase}-RESEARCH.md`. Scout has `disallowedTools: Write` (platform-enforced) and cannot write files. Resolve Scout model:
      ```bash
@@ -266,7 +266,7 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
    Pass `model: "${SCOUT_MODEL}"` and `maxTurns: ${SCOUT_MAX_TURNS}` to the Task tool.
    - **If exists:** Include it in Lead's context for incremental refresh. Lead may update RESEARCH.md if new information emerges.
    - **On failure:** Log warning, continue planning without research. Do not block.
-   - If `v3_plan_research_persist=false` or effort=turbo: skip entirely.
+   - If effort=turbo: skip entirely.
 4. **Context compilation:** If `config_context_compiler=true`, run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-context.sh {phase} lead {phases_dir}`. Include `.context-lead.md` in Lead agent context if produced.
 5. **Turbo shortcut:** If effort=turbo, skip Lead. Read phase reqs from ROADMAP.md, create single lightweight PLAN.md inline.
 6. **Other efforts:**
@@ -361,20 +361,19 @@ No SUMMARY.md: STOP "Phase {N} has no completed plans. Run /vbw:vibe first."
 Missing name: STOP "Usage: `/vbw:vibe --add <phase-name>`"
 
 **Steps:**
-1. Resolve context: ACTIVE -> milestone-scoped paths, otherwise defaults.
-2. **Codebase context:** If `.vbw-planning/codebase/META.md` exists, read ARCHITECTURE.md and CONCERNS.md (whichever exist) from `.vbw-planning/codebase/`. Use this to inform phase goal scoping and identify relevant modules/services.
-3. Parse args: phase name (first non-flag arg), --goal (optional), slug (lowercase hyphenated).
-4. Next number: highest in ROADMAP.md + 1, zero-padded.
-5. Create dir: `mkdir -p {PHASES_DIR}/{NN}-{slug}/`
-6. **Problem research (conditional):** If $ARGUMENTS contain a problem description (bug report, feature request, multi-sentence intent) rather than just a bare phase name:
+1. **Codebase context:** If `.vbw-planning/codebase/META.md` exists, read ARCHITECTURE.md and CONCERNS.md (whichever exist) from `.vbw-planning/codebase/`. Use this to inform phase goal scoping and identify relevant modules/services.
+2. Parse args: phase name (first non-flag arg), --goal (optional), slug (lowercase hyphenated).
+3. Next number: highest in ROADMAP.md + 1, zero-padded.
+4. Create dir: `mkdir -p .vbw-planning/phases/{NN}-{slug}/`
+5. **Problem research (conditional):** If $ARGUMENTS contain a problem description (bug report, feature request, multi-sentence intent) rather than just a bare phase name:
    - Resolve Scout model: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json`
    - Resolve Scout max turns: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "$(jq -r '.effort // "balanced"' .vbw-planning/config.json 2>/dev/null)"`
    - Spawn Scout agent to research the problem in the codebase. Scout returns structured findings with sections: `## Findings`, `## Relevant Patterns`, `## Risks`, `## Recommendations`. Scout has `disallowedTools: Write` and cannot write files — the **orchestrator** writes the returned findings to `{phase-dir}/{NN}-RESEARCH.md`.
    - Use Scout findings to write an informed phase goal and success criteria in ROADMAP.md.
    - On failure: log warning, write phase goal from $ARGUMENTS alone. Do not block.
    - **This eliminates duplicate research** — Plan mode step 3 checks for existing RESEARCH.md and skips Scout if found.
-7. Update ROADMAP.md: append phase list entry, append Phase Details section (using Scout findings if available), add progress row.
-8. Present: Phase Banner with milestone, position, goal. Checklist for roadmap update + dir creation. Next Up: `/vbw:vibe --discuss` or `/vbw:vibe --plan`.
+6. Update ROADMAP.md: append phase list entry, append Phase Details section (using Scout findings if available), add progress row.
+7. Present: Phase Banner with position, goal. Checklist for roadmap update + dir creation. Next Up: `/vbw:vibe --discuss` or `/vbw:vibe --plan`.
 
 ### Mode: Insert Phase
 
@@ -384,15 +383,14 @@ Invalid position (out of range 1 to max+1): STOP with valid range.
 Inserting before completed phase: WARN + confirm.
 
 **Steps:**
-1. Resolve context: ACTIVE -> milestone-scoped paths, otherwise defaults.
-2. **Codebase context:** If `.vbw-planning/codebase/META.md` exists, read ARCHITECTURE.md and CONCERNS.md (whichever exist) from `.vbw-planning/codebase/`. Use this to inform phase goal scoping and identify relevant modules/services.
-3. Parse args: position (int), phase name, --goal (optional), slug (lowercase hyphenated).
-4. Identify renumbering: all phases >= position shift up by 1.
-5. Renumber dirs in REVERSE order: rename dir {NN}-{slug} -> {NN+1}-{slug}, rename internal PLAN/SUMMARY files, update `phase:` frontmatter, update `depends_on` references.
-6. Create dir: `mkdir -p {PHASES_DIR}/{NN}-{slug}/`
-7. **Problem research (conditional):** Same as Add Phase step 6 — if $ARGUMENTS contain a problem description, spawn Scout to research the codebase. Scout returns findings; the **orchestrator** writes `{phase-dir}/{NN}-RESEARCH.md`. This prevents Plan mode from duplicating the research.
-8. Update ROADMAP.md: insert new phase entry + details at position (using Scout findings if available), renumber subsequent entries/headers/cross-refs, update progress table.
-9. Present: Phase Banner with renumber count, phase changes, file checklist, Next Up.
+1. **Codebase context:** If `.vbw-planning/codebase/META.md` exists, read ARCHITECTURE.md and CONCERNS.md (whichever exist) from `.vbw-planning/codebase/`. Use this to inform phase goal scoping and identify relevant modules/services.
+2. Parse args: position (int), phase name, --goal (optional), slug (lowercase hyphenated).
+3. Identify renumbering: all phases >= position shift up by 1.
+4. Renumber dirs in REVERSE order: rename dir {NN}-{slug} -> {NN+1}-{slug}, rename internal PLAN/SUMMARY files, update `phase:` frontmatter, update `depends_on` references.
+5. Create dir: `mkdir -p .vbw-planning/phases/{NN}-{slug}/`
+6. **Problem research (conditional):** Same as Add Phase step 5 — if $ARGUMENTS contain a problem description, spawn Scout to research the codebase. Scout returns findings; the **orchestrator** writes `{phase-dir}/{NN}-RESEARCH.md`. This prevents Plan mode from duplicating the research.
+7. Update ROADMAP.md: insert new phase entry + details at position (using Scout findings if available), renumber subsequent entries/headers/cross-refs, update progress table.
+8. Present: Phase Banner with renumber count, phase changes, file checklist, Next Up.
 
 ### Mode: Remove Phase
 
@@ -403,13 +401,12 @@ Has work (PLAN.md or SUMMARY.md): STOP "Phase {N} has artifacts. Remove plans fi
 Completed ([x] in roadmap): STOP "Cannot remove completed Phase {N}."
 
 **Steps:**
-1. Resolve context: ACTIVE -> milestone-scoped paths, otherwise defaults.
-2. Parse args: extract phase number, validate, look up name/slug.
-3. Confirm: display phase details, ask confirmation. Not confirmed -> STOP.
-4. Remove dir: `rm -rf {PHASES_DIR}/{NN}-{slug}/`
-5. Renumber FORWARD: for each phase > removed: rename dir {NN} -> {NN-1}, rename internal files, update frontmatter, update depends_on.
-6. Update ROADMAP.md: remove phase entry + details, renumber subsequent, update deps, update progress table.
-7. Present: Phase Banner with renumber count, phase changes, file checklist, Next Up.
+1. Parse args: extract phase number, validate, look up name/slug.
+2. Confirm: display phase details, ask confirmation. Not confirmed -> STOP.
+3. Remove dir: `rm -rf .vbw-planning/phases/{NN}-{slug}/`
+4. Renumber FORWARD: for each phase > removed: rename dir {NN} -> {NN-1}, rename internal files, update frontmatter, update depends_on.
+5. Update ROADMAP.md: remove phase entry + details, renumber subsequent, update deps, update progress table.
+6. Present: Phase Banner with renumber count, phase changes, file checklist, Next Up.
 
 ### Mode: Archive
 
@@ -428,16 +425,16 @@ Run 6-point audit matrix:
 FAIL -> STOP with remediation suggestions. WARN -> proceed with warnings.
 
 **Steps:**
-1. Resolve context: ACTIVE -> milestone-scoped paths. No ACTIVE -> SLUG="default", root paths.
+1. Derive milestone slug from ROADMAP.md phase names (kebab-case, max 60 chars). Override with --tag if provided.
 2. Parse args: --tag=vN.N.N (custom tag), --no-tag (skip), --force (skip audit).
 3. Compute summary: from ROADMAP (phases), SUMMARY.md files (tasks/commits/deviations), REQUIREMENTS.md (satisfied count).
-4. **Rolling summary (conditional):** If `v3_rolling_summary=true` in config:
+4. **Rolling summary (conditional):** If `rolling_summary=true` in config:
    ```bash
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-rolling-summary.sh \
      .vbw-planning/phases .vbw-planning/ROLLING-CONTEXT.md 2>/dev/null || true
    ```
    Compiles final rolling context before artifacts move to milestones/. Fail-open.
-   When `v3_rolling_summary=false`: skip.
+   When `rolling_summary=false`: skip.
 5. Archive: `mkdir -p .vbw-planning/milestones/`. Move roadmap, state, phases to milestones/{SLUG}/. Write SHIPPED.md. Delete stale RESUME.md.
 5b. **Persist project-level state:** After archiving, run:
    ```bash
@@ -452,9 +449,8 @@ FAIL -> STOP with remediation suggestions. WARN -> proceed with warnings.
    Run this BEFORE branch merge/tag so shipped planning state is committed.
 7. Git branch merge: if `milestone/{SLUG}` branch exists, merge --no-ff. Conflict -> abort, warn. No branch -> skip.
 8. Git tag: unless --no-tag, `git tag -a {tag} -m "Shipped milestone: {name}"`. Default: `milestone/{SLUG}`.
-9. Update ACTIVE: remaining milestones -> set ACTIVE to first. None -> remove ACTIVE.
-10. Regenerate CLAUDE.md: update Active Context, remove shipped refs. Preserve non-VBW content — only replace VBW-managed sections, keep user's own sections intact.
-11. Present: Phase Banner with metrics (phases, tasks, commits, requirements, deviations), archive path, tag, branch status, memory status. Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh vibe`.
+9. Regenerate CLAUDE.md: update Active Context, remove shipped refs. Preserve non-VBW content — only replace VBW-managed sections, keep user's own sections intact.
+10. Present: Phase Banner with metrics (phases, tasks, commits, requirements, deviations), archive path, tag, branch status, memory status. Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh vibe`.
 
 ### Pure-Vibe Phase Loop
 

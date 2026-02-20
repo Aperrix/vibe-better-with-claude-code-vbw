@@ -50,6 +50,27 @@ teardown() {
   echo "$output" | jq -e '.hookSpecificOutput.additionalContext' >/dev/null
 }
 
+@test "session-start: no phases does not crash and suggests scoping" {
+  cd "$TEST_TEMP_DIR"
+  rm -rf .vbw-planning/phases
+
+  run bash "$SCRIPTS_DIR/session-start.sh"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.hookSpecificOutput.additionalContext | contains("Next: /vbw:vibe (needs scoping).")' >/dev/null
+}
+
+@test "session-start: no phases with shipped milestones suggests new milestone" {
+  cd "$TEST_TEMP_DIR"
+  rm -rf .vbw-planning/phases
+  mkdir -p .vbw-planning/milestones/01-foundation
+  echo "# SHIPPED" > .vbw-planning/milestones/01-foundation/SHIPPED.md
+
+  run bash "$SCRIPTS_DIR/session-start.sh"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.hookSpecificOutput.additionalContext | contains("Shipped milestones: true.")' >/dev/null
+  echo "$output" | jq -e '.hookSpecificOutput.additionalContext | contains("Next: /vbw:vibe (all milestones shipped, start next milestone).")' >/dev/null
+}
+
 @test "session-start: runs normally when compaction marker is stale (>60s)" {
   cd "$TEST_TEMP_DIR"
   # Write a timestamp 120 seconds in the past
@@ -108,7 +129,7 @@ teardown() {
 
 @test "post-compact: restores role-matched snapshot and infers pending plan" {
   cd "$TEST_TEMP_DIR"
-  jq '.v3_snapshot_resume = true' .vbw-planning/config.json > .vbw-planning/config.json.tmp && \
+  jq '.snapshot_resume = true' .vbw-planning/config.json > .vbw-planning/config.json.tmp && \
     mv .vbw-planning/config.json.tmp .vbw-planning/config.json
 
   cat > .vbw-planning/.execution-state.json <<'STATE'

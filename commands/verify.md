@@ -30,7 +30,7 @@ Phase state:
 !`bash ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}/scripts/phase-detect.sh 2>/dev/null || echo "phase_detect_error=true"`
 ```
 
-!`bash ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}/scripts/suggest-compact.sh verify 2>/dev/null`
+!`bash ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}/scripts/suggest-compact.sh verify 2>/dev/null || true`
 
 ## Guard
 
@@ -43,7 +43,7 @@ Phase state:
 ### 1. Resolve phase and load summaries
 
 - Parse explicit phase number from $ARGUMENTS, or use auto-detected phase
-- Resolve milestone: if .vbw-planning/ACTIVE exists, use milestone-scoped paths
+- Use `.vbw-planning/phases/` for phase directories
 - Read all `*-SUMMARY.md` files in the phase directory
 - Read corresponding `*-PLAN.md` files for `must_haves` and success criteria
 
