@@ -50,6 +50,23 @@ is_expanded_vbw_prompt() {
   [ -n "$frontmatter" ] && printf '%s\n' "$frontmatter" | grep -qiE '^[[:space:]]*name:[[:space:]]*vbw:'
 }
 
+is_archive_vibe_prompt() {
+  local prompt="$1"
+
+  # Raw slash command shape
+  if printf '%s\n' "$prompt" | grep -qiE '/vbw:vibe[^[:cntrl:]]*--archive'; then
+    return 0
+  fi
+
+  # Expanded command shape (frontmatter name: vbw:*)
+  # If this expanded prompt includes --archive, treat it as an archive intent.
+  if is_expanded_vbw_prompt "$prompt" && printf '%s\n' "$prompt" | grep -qi -- '--archive'; then
+    return 0
+  fi
+
+  return 1
+}
+
 # GSD Isolation: create .vbw-session marker on VBW command invocation.
 # Detection covers raw slash commands (/vbw:*) and expanded command content
 # (YAML frontmatter with "name: vbw:").
@@ -85,7 +102,7 @@ if echo "$PROMPT" | grep -q '/vbw:vibe.*--execute'; then
 fi
 
 # Check: /vbw:vibe --archive with incomplete phases
-if echo "$PROMPT" | grep -q '/vbw:vibe.*--archive'; then
+if is_archive_vibe_prompt "$PROMPT"; then
   # Hard gate: unresolved UAT (active or milestone) blocks archive requests,
   # including bypass attempts like --skip-audit / --force.
   GUARD_SCRIPT="$(dirname "$0")/archive-uat-guard.sh"

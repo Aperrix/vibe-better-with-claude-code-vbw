@@ -131,6 +131,43 @@ EOF
   [[ "$output" != *"/vbw:fix"* ]]
 }
 
+@test "suggest-next verify issues_found handles Status key with trailing spaces" {
+  cd "$TEST_TEMP_DIR"
+  local phase_dir="$TEST_TEMP_DIR/.vbw-planning/phases/09-status-drift"
+  mkdir -p "$phase_dir"
+  cat > "$phase_dir/09-01-PLAN.md" <<'EOF'
+---
+phase: 09
+plan: 09-01
+title: Sample plan
+---
+EOF
+  cat > "$phase_dir/09-01-SUMMARY.md" <<'EOF'
+---
+status: complete
+deviations: 0
+---
+Done.
+EOF
+  cat > "$phase_dir/09-UAT.md" <<'EOF'
+---
+phase: 09
+Status: issues_found   
+---
+
+## Tests
+
+- Result: issue
+- Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/suggest-next.sh" verify issues_found 09
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"/vbw:vibe -- Continue UAT remediation for Phase 9"* ]]
+  [[ "$output" != *"/vbw:fix -- Fix the issues found during UAT"* ]]
+}
+
 @test "suggest-next verify issues_found detects bare-text minor severity" {
   cd "$TEST_TEMP_DIR"
   local phase_dir="$TEST_TEMP_DIR/.vbw-planning/phases/07-bare-fmt"

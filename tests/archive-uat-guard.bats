@@ -331,3 +331,83 @@ EOF
   [ "$status" -eq 2 ]
   echo "$output" | jq -e '.hookSpecificOutput.additionalContext | contains("VBW pre-flight block")' >/dev/null
 }
+
+@test "phase-detect handles milestone and phase paths with spaces" {
+  mkdir -p .vbw-planning/phases
+  mkdir -p ".vbw-planning/milestones/01 legacy/phases/01 core"
+  echo "# Shipped" > ".vbw-planning/milestones/01 legacy/SHIPPED.md"
+
+  touch ".vbw-planning/milestones/01 legacy/phases/01 core/01-01-PLAN.md"
+  touch ".vbw-planning/milestones/01 legacy/phases/01 core/01-01-SUMMARY.md"
+  cat > ".vbw-planning/milestones/01 legacy/phases/01 core/01-UAT.md" <<'EOF'
+---
+phase: 01
+status: issues_found
+---
+  - Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "milestone_uat_issues=true"
+  echo "$output" | grep -q "milestone_uat_slug=01 legacy"
+}
+
+@test "archive-uat-guard blocks unresolved milestone UAT when paths contain spaces" {
+  echo "# Project" > .vbw-planning/PROJECT.md
+  mkdir -p .vbw-planning/phases
+  mkdir -p ".vbw-planning/milestones/01 legacy/phases/01 core"
+  echo "# Shipped" > ".vbw-planning/milestones/01 legacy/SHIPPED.md"
+
+  touch ".vbw-planning/milestones/01 legacy/phases/01 core/01-01-PLAN.md"
+  touch ".vbw-planning/milestones/01 legacy/phases/01 core/01-01-SUMMARY.md"
+  cat > ".vbw-planning/milestones/01 legacy/phases/01 core/01-UAT.md" <<'EOF'
+---
+phase: 01
+status: issues_found
+---
+  - Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/archive-uat-guard.sh"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"01 legacy"* ]]
+}
+
+@test "phase-detect treats Status key and trailing spaces as unresolved UAT" {
+  mkdir -p .vbw-planning/phases/01-core
+  touch .vbw-planning/phases/01-core/01-01-PLAN.md
+  touch .vbw-planning/phases/01-core/01-01-SUMMARY.md
+  cat > .vbw-planning/phases/01-core/01-UAT.md <<'EOF'
+---
+phase: 01
+Status: issues_found   
+---
+Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "uat_issues_phase=01"
+}
+
+@test "prompt-preflight blocks expanded archive prompt with --skip-audit --force" {
+  echo "# Project" > .vbw-planning/PROJECT.md
+  mkdir -p .vbw-planning/phases
+  mkdir -p .vbw-planning/milestones/01-foundation/phases/08-cost-basis/
+  echo "# Shipped" > .vbw-planning/milestones/01-foundation/SHIPPED.md
+  touch .vbw-planning/milestones/01-foundation/phases/08-cost-basis/08-01-PLAN.md
+  touch .vbw-planning/milestones/01-foundation/phases/08-cost-basis/08-01-SUMMARY.md
+  cat > .vbw-planning/milestones/01-foundation/phases/08-cost-basis/08-UAT.md <<'EOF'
+---
+phase: 08
+status: issues_found
+---
+  - Severity: major
+EOF
+
+  INPUT='{"prompt":"---\nname: vbw:vibe\ndescription: Main entry point\n---\nVBW Vibe: --archive --skip-audit --force"}'
+  run bash -c "cd '$TEST_TEMP_DIR' && echo '$INPUT' | bash '$SCRIPTS_DIR/prompt-preflight.sh'"
+  [ "$status" -eq 2 ]
+  echo "$output" | jq -e '.hookSpecificOutput.additionalContext | contains("VBW pre-flight block")' >/dev/null
+}

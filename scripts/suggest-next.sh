@@ -54,6 +54,22 @@ milestone_uat_issues=false
 milestone_uat_phase="none"
 milestone_uat_slug="none"
 
+read_status_field() {
+  local file="$1"
+  awk '
+    {
+      line = $0
+      if (tolower(line) ~ /^[[:space:]]*status[[:space:]]*:/) {
+        value = line
+        sub(/^[^:]*:[[:space:]]*/, "", value)
+        gsub(/[[:space:]]+$/, "", value)
+        print tolower(value)
+        exit
+      }
+    }
+  ' "$file" 2>/dev/null || true
+}
+
 if [ -d "$PLANNING_DIR" ]; then
 
   # Canonical post-archive UAT recovery state from phase-detect.sh
@@ -159,7 +175,7 @@ if [ -d "$PLANNING_DIR" ]; then
           *) deviation_count=$((deviation_count + 1)) ;;  # non-empty, non-numeric = at least 1
         esac
         # Check for failed/partial status
-        s=$(grep -m1 '^status:' "$sf" 2>/dev/null | sed 's/status:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' || true)
+        s=$(read_status_field "$sf")
         if [ "$s" = "failed" ] || [ "$s" = "partial" ]; then
           plan_id=$(basename "$sf" | sed 's/-SUMMARY.md//')
           failing_plan_ids="${failing_plan_ids:+$failing_plan_ids }$plan_id"
@@ -169,7 +185,7 @@ if [ -d "$PLANNING_DIR" ]; then
       # Check for completed UAT in active phase
       for uf in "$active_phase_dir"/*-UAT.md; do
         [ -f "$uf" ] || continue
-        us=$(grep -m1 '^status:' "$uf" 2>/dev/null | sed 's/status:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' || true)
+        us=$(read_status_field "$uf")
         if [ "$us" = "complete" ]; then
           has_uat=true
         fi
@@ -234,7 +250,7 @@ if [ "$CMD" = "verify" ] && [ "$effective_result" = "issues_found" ] && [ -d "${
       fi
       _uat=$(ls -1 "$dir"[0-9]*-UAT.md 2>/dev/null | sort | tail -1 || true)
       if [ -f "$_uat" ]; then
-        _us=$(grep -m1 '^status:' "$_uat" 2>/dev/null | sed 's/status:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' || true)
+        _us=$(read_status_field "$_uat")
         if [ "$_us" = "issues_found" ]; then
           verify_target_phase_dir="$dir"
           verify_target_phase=$(basename "$dir" | sed 's/[^0-9].*//' | sed 's/^0*//')

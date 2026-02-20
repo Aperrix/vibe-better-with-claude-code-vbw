@@ -6,6 +6,30 @@ trap 'exit 0' EXIT
 
 PLANNING_DIR=".vbw-planning"
 
+list_child_dirs_sorted() {
+  local parent="$1"
+  [ -d "$parent" ] || return 0
+
+  find "$parent" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null |
+    (sort -V 2>/dev/null || awk -F/ '{n=$NF; gsub(/[^0-9].*/,"",n); if (n == "") n=0; print (n+0)"\t"$0}' | sort -n -k1,1 -k2,2 | cut -f2-)
+}
+
+extract_status_value() {
+  local file="$1"
+  awk '
+    {
+      line = $0
+      if (tolower(line) ~ /^[[:space:]]*status[[:space:]]*:/) {
+        value = line
+        sub(/^[^:]*:[[:space:]]*/, "", value)
+        gsub(/[[:space:]]+$/, "", value)
+        print tolower(value)
+        exit
+      }
+    }
+  ' "$file" 2>/dev/null || true
+}
+
 # --- jq availability ---
 JQ_AVAILABLE=false
 if command -v jq &>/dev/null; then
@@ -67,16 +91,21 @@ echo "phases_dir=$PHASES_DIR"
 # --- Shipped milestones detection ---
 HAS_SHIPPED_MILESTONES=false
 NEEDS_MILESTONE_RENAME=false
-MILESTONE_SCAN_DIRS=""
+MILESTONE_SCAN_DIRS=()
 if [ -d "$PLANNING_DIR/milestones" ]; then
-  MILESTONE_DIRS=$(ls -d "$PLANNING_DIR"/milestones/*/ 2>/dev/null | (sort -V 2>/dev/null || sort))
-  for _ms_dir in $MILESTONE_DIRS; do
+  MILESTONE_DIRS=()
+  while IFS= read -r _ms_dir; do
+    [ -n "$_ms_dir" ] || continue
+    MILESTONE_DIRS+=("${_ms_dir%/}/")
+  done < <(list_child_dirs_sorted "$PLANNING_DIR/milestones")
+
+  for _ms_dir in "${MILESTONE_DIRS[@]}"; do
     [ -d "$_ms_dir" ] || continue
 
     # Canonical archived milestone marker
     if [ -f "${_ms_dir}SHIPPED.md" ]; then
       HAS_SHIPPED_MILESTONES=true
-      MILESTONE_SCAN_DIRS="${MILESTONE_SCAN_DIRS}${MILESTONE_SCAN_DIRS:+ }$_ms_dir"
+      MILESTONE_SCAN_DIRS+=("$_ms_dir")
       continue
     fi
 
@@ -84,7 +113,7 @@ if [ -d "$PLANNING_DIR/milestones" ]; then
     # contain archived phase artifacts. Treat as shipped for recovery scanning.
     if [ -d "${_ms_dir}phases" ] && ls -d "${_ms_dir}phases"/*/ >/dev/null 2>&1; then
       HAS_SHIPPED_MILESTONES=true
-      MILESTONE_SCAN_DIRS="${MILESTONE_SCAN_DIRS}${MILESTONE_SCAN_DIRS:+ }$_ms_dir"
+      MILESTONE_SCAN_DIRS+=("$_ms_dir")
     fi
   done
   [ -d "$PLANNING_DIR/milestones/default" ] && NEEDS_MILESTONE_RENAME=true
@@ -106,18 +135,20 @@ UAT_ISSUES_MAJOR_OR_HIGHER=false
 if [ -d "$PHASES_DIR" ]; then
   # Collect phase directories in numeric order (prevents 100 sorting before 11)
   # Fallback: extract numeric prefix from basename for systems without sort -V
-  PHASE_DIRS=$(ls -d "$PHASES_DIR"/*/ 2>/dev/null | (sort -V 2>/dev/null || awk -F/ '{n=$(NF-1); gsub(/[^0-9].*/,"",n); print (n+0)"\t"$0}' | sort -n | cut -f2-))
+  PHASE_DIRS=()
+  while IFS= read -r _phase_dir; do
+    [ -n "$_phase_dir" ] || continue
+    PHASE_DIRS+=("${_phase_dir%/}/")
+  done < <(list_child_dirs_sorted "$PHASES_DIR")
 
-  for DIR in $PHASE_DIRS; do
-    PHASE_COUNT=$((PHASE_COUNT + 1))
-  done
+  PHASE_COUNT=${#PHASE_DIRS[@]}
 
   if [ "$PHASE_COUNT" -eq 0 ]; then
     NEXT_PHASE_STATE="no_phases"
   else
     # Priority override: unresolved UAT issues should route first for no-arg /vbw:vibe.
     # Guard: only consider phases that have at least one PLAN and one SUMMARY (i.e., executed).
-    for DIR in $PHASE_DIRS; do
+    for DIR in "${PHASE_DIRS[@]}"; do
       DIRNAME=$(basename "$DIR")
       NUM=$(echo "$DIRNAME" | sed 's/^\([0-9]*\).*/\1/')
 
@@ -131,7 +162,7 @@ if [ -d "$PHASES_DIR" ]; then
 
       UAT_FILE=$(ls "$DIR"[0-9]*-UAT.md 2>/dev/null | sort | tail -1 || true)
       if [ -f "$UAT_FILE" ]; then
-        UAT_STATUS=$(grep -m1 '^status:' "$UAT_FILE" 2>/dev/null | sed 's/status:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' || true)
+        UAT_STATUS=$(extract_status_value "$UAT_FILE")
         if [ "$UAT_STATUS" = "issues_found" ]; then
           UAT_ISSUES_PHASE="$NUM"
           UAT_ISSUES_SLUG="$DIRNAME"
@@ -159,7 +190,7 @@ if [ -d "$PHASES_DIR" ]; then
       NEXT_PHASE_SUMMARIES=$(ls "$TARGET_DIR"[0-9]*-SUMMARY.md 2>/dev/null | wc -l | tr -d ' ')
     else
       ALL_DONE=true
-      for DIR in $PHASE_DIRS; do
+      for DIR in "${PHASE_DIRS[@]}"; do
         DIRNAME=$(basename "$DIR")
         # Extract numeric prefix (e.g., "01" from "01-context-diet")
         NUM=$(echo "$DIRNAME" | sed 's/^\([0-9]*\).*/\1/')
@@ -226,19 +257,23 @@ MILESTONE_UAT_MAJOR_OR_HIGHER=false
 MILESTONE_UAT_PHASE_DIR="none"
 
 if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] || [ "$NEXT_PHASE_STATE" = "no_phases" ]; } && [ "$HAS_SHIPPED_MILESTONES" = true ]; then
-  for _ms_dir in $MILESTONE_SCAN_DIRS; do
+  for _ms_dir in "${MILESTONE_SCAN_DIRS[@]}"; do
     [ -d "$_ms_dir" ] || continue
     [ -d "${_ms_dir}phases" ] || continue
 
     MS_SLUG=$(basename "$_ms_dir")
-    MS_PHASE_DIRS=$(ls -d "${_ms_dir}phases"/*/ 2>/dev/null | (sort -V 2>/dev/null || awk -F/ '{n=$(NF-1); gsub(/[^0-9].*/,"",n); print (n+0)"\t"$0}' | sort -n | cut -f2-))
+    MS_PHASE_DIRS=()
+    while IFS= read -r _ms_phase_dir; do
+      [ -n "$_ms_phase_dir" ] || continue
+      MS_PHASE_DIRS+=("${_ms_phase_dir%/}/")
+    done < <(list_child_dirs_sorted "${_ms_dir}phases")
 
     _ms_issue_found=false
     _ms_issue_phase="none"
     _ms_issue_phase_dir="none"
     _ms_issue_major_or_higher=false
 
-    for _ms_phase_dir in $MS_PHASE_DIRS; do
+    for _ms_phase_dir in "${MS_PHASE_DIRS[@]}"; do
       [ -d "$_ms_phase_dir" ] || continue
       _ms_dirname=$(basename "$_ms_phase_dir")
       _ms_num=$(echo "$_ms_dirname" | sed 's/^\([0-9]*\).*/\1/')
@@ -252,7 +287,7 @@ if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] ||
 
       _ms_uat=$(ls "$_ms_phase_dir"[0-9]*-UAT.md 2>/dev/null | sort | tail -1 || true)
       if [ -f "$_ms_uat" ]; then
-        _ms_uat_status=$(grep -m1 '^status:' "$_ms_uat" 2>/dev/null | sed 's/status:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' || true)
+        _ms_uat_status=$(extract_status_value "$_ms_uat")
         if [ "$_ms_uat_status" = "issues_found" ]; then
           _ms_issue_found=true
           _ms_issue_phase="$_ms_num"
