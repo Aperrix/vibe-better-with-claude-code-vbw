@@ -10,20 +10,45 @@ Thanks for considering a contribution. VBW is a Claude Code plugin, so the conve
 
 ## Local Development
 
-Clone the repo, install the git hooks, and load it as a local plugin:
+Clone the repo:
 
 ```bash
 git clone https://github.com/yidakee/vibe-better-with-claude-code-vbw.git
-cd vibe-better-with-claude-code-vbw
-bash scripts/install-hooks.sh
-claude --plugin-dir .
 ```
 
-The pre-push hook checks version file consistency (see Version Management below). All `/vbw:*` commands will be available. Restart Claude Code to pick up changes.
+### Loading your local VBW
+
+If you have VBW installed from the marketplace, uninstall it and clear the caches first so the marketplace version doesn't conflict with your local copy:
+
+```bash
+# Inside a Claude Code session
+/plugin uninstall vbw@vbw-marketplace
+
+# Then back in your regular terminal
+rm -rf ~/.claude/plugins/cache/vbw-marketplace
+rm -rf ~/.claude/commands/vbw
+```
+
+Use `--plugin-dir` with the **absolute path** to your cloned VBW repo. This works from any directory — you don't need to be inside the VBW repo.
+
+```bash
+# From inside the VBW repo itself (quick smoke test)
+claude --plugin-dir .
+
+# From any other project (the typical case — testing VBW against a real codebase)
+cd ~/repos/my-other-project
+claude --plugin-dir <path-to-vbw-clone>
+```
+
+All `/vbw:*` commands will load from your local copy. Restart Claude Code to pick up changes after editing VBW files.
+
+> **Important:** `--plugin-dir` loads whatever is on disk in your VBW clone, which means whatever branch is currently checked out. Make sure you're on the branch with your changes before launching Claude Code — if you're on `main`, you'll be testing the unchanged version.
+
+> **Known limitation:** Plugin hooks resolve scripts from the marketplace cache (`~/.claude/plugins/cache/...`), not from `--plugin-dir`. In local dev mode the cache is empty, so **all hooks are no-ops** — security filters, QA gates, commit validation, session-start migration, etc. will not run. Commands and agents load correctly; only hooks are affected. Keep this in mind when testing hook-dependent features.
 
 ## Project Structure
 
-```
+```text
 .claude-plugin/    Plugin manifest (plugin.json)
 agents/            7 agent definitions with native tool permissions
 commands/          24 slash commands (commands/*.md)
@@ -41,14 +66,6 @@ Key conventions:
 - **Agents** in `agents/` use YAML frontmatter for tool permissions enforced by the platform.
 - **Hooks** in `hooks/hooks.json` self-resolve scripts via `ls | sort -V | tail -1` against the plugin cache (they do not use `CLAUDE_PLUGIN_ROOT`).
 
-## Making Changes
-
-1. **Fork the repo** and create a feature branch from `main`.
-2. **Test locally** with `claude --plugin-dir .` before submitting.
-   - Run automated checks: `bash testing/run-all.sh`
-3. **Keep commits atomic** -- one logical change per commit.
-4. **Match the existing tone** in command descriptions and user-facing text. VBW is direct, dry, and self-aware. It doesn't use corporate language or unnecessary enthusiasm.
-
 ## What to Contribute
 
 Good candidates:
@@ -65,20 +82,72 @@ Less good candidates:
 - Features that require dependencies or build steps (VBW is zero-dependency by design)
 - Changes that break the effort profile system
 
+## Making Changes
+
+1. **Fork the repo** and create a feature branch from `main` (e.g., `fix/hook-path` or `feat/new-command`). **Never commit directly to `main`** — `main` has branch protection and direct pushes will be rejected.
+2. **Test locally** with `claude --plugin-dir <path-to-vbw-clone>` against a real project before submitting.
+   - Run automated checks: `bash testing/run-all.sh` (validates script conventions, command frontmatter, init workflow, and bootstrap)
+3. **Keep commits atomic** -- one logical change per commit.
+4. **Match the existing tone** in command descriptions and user-facing text. VBW is direct, dry, and self-aware. It doesn't use corporate language or unnecessary enthusiasm.
+5. **Follow code style:**
+   - Shell scripts: bash, no external dependencies beyond `jq` and `git`
+   - Markdown commands: YAML frontmatter with single-line `description` field
+   - No prettier on `.md` files with frontmatter (use `.prettierignore`)
+
 ## Pull Request Process
 
 1. Open an issue first for non-trivial changes so we can discuss the approach.
 2. Reference the issue in your PR.
 3. Describe what changed and why. Include before/after if relevant.
-4. Ensure `claude --plugin-dir .` loads without errors.
-5. Test your changes against at least one real project.
+4. Ensure `claude --plugin-dir <path-to-vbw-clone>` loads without errors.
+5. Test your changes against at least one real project (not the VBW repo itself).
+6. **Run QA review before marking ready.** Repeat this cycle at least 2–4 times:
+
+   **Step A — Run the QA prompt.** Open a **new** Claude Code (or other AI) session and paste the prompt below (fill in the placeholders):
+
+   ````text
+   You are a read-only QA reviewer. Do NOT modify files, make commits, or push fixes — report only.
+
+   PR: #<number>
+   Branch: <branch-name>
+
+   1. Review the commits in the PR to understand the change narrative.
+   2. Read all files changed in the PR for full context.
+   3. Act as a devil's advocate — find edge cases, missed regressions, and untested
+      paths the implementer didn't consider.
+
+   Do NOT prescribe what to test upfront. Discover what matters by reading the code.
+
+   Report format (use a markdown code block):
+   - What was tested
+   - Expected vs actual
+   - Severity (critical / major / minor)
+   - Confirmed vs hypothetical
+   ````
+
+   **Step B — Fix the findings.** Copy the QA report and paste it into your original working session (or a new session on the same branch). Tell it to fix the issues found. Each QA round's fixes must be a **separate commit** — do not amend previous commits. Use the format `fix(scope): address QA round N`.
+
+   **Step C — Repeat.** Go back to Step A with a fresh session. The new QA round will see the fix commits from Step B and look for anything still missed. Continue until a round comes back clean or only has hypothetical/minor findings.
+
+   **Proving your work:** Paste each round's QA report as a separate comment on the PR. Reviewers will cross-reference the reports against the fix commits in the PR history.
+
+### Switching back to marketplace VBW
+
+When you're done testing your local changes, re-install the marketplace version:
+
+```bash
+# Inside a Claude Code session (without --plugin-dir)
+claude
+/plugin marketplace add yidakee/vibe-better-with-claude-code-vbw
+/plugin install vbw@vbw-marketplace
+```
 
 ## Version Management
 
 VBW keeps the version in sync across four files:
 
 | File | Field |
-|------|-------|
+| ------ | ------- |
 | `VERSION` | Plain text, single line |
 | `.claude-plugin/plugin.json` | `.version` |
 | `.claude-plugin/marketplace.json` | `.plugins[0].version` |
@@ -116,19 +185,7 @@ git push
 
 The hook only blocks pushes if the 4 version files have mismatched values. Use `git push --no-verify` to bypass in rare cases.
 
-**Install the hook after cloning:**
-
-```bash
-bash scripts/install-hooks.sh
-```
-
-> **Note:** If you use VBW, the hook is auto-installed by `/vbw:init` and on session start. Manual installation is only needed for contributors not using VBW.
-
-## Code Style
-
-- Shell scripts: bash, no external dependencies beyond `jq` and `git`
-- Markdown commands: YAML frontmatter with single-line `description` field
-- No prettier on `.md` files with frontmatter (use `.prettierignore`)
+The pre-push hook is auto-installed by `/vbw:init` and on session start when running VBW via `--plugin-dir`. No manual installation needed.
 
 ## Reporting Bugs
 

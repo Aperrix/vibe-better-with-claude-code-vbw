@@ -51,3 +51,31 @@ jobs:
 
       - name: Verify command contracts
         run: bash testing/verify-commands-contract.sh
+
+  qa-review-check:
+    name: QA Review Evidence
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for QA round commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get commits in this PR
+          commits=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits" --paginate --jq '.[].commit.message')
+
+          # Count commits matching: fix(something): address QA round N
+          qa_count=$(echo "$commits" | grep -ciE '^fix\(.*\): address QA round [0-9]+' || true)
+
+          echo "Found $qa_count QA round commit(s)"
+
+          if [ "$qa_count" -lt 2 ]; then
+            echo "::error::PR requires at least 2 QA round commits (fix(scope): address QA round N). Found $qa_count. See CONTRIBUTING.md for the QA review process."
+            exit 1
+          fi
+
+          echo "QA review evidence verified ($qa_count rounds)"
