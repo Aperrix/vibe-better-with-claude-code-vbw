@@ -24,6 +24,7 @@ CMD="${1:-}"
 RESULT="${2:-}"
 TARGET_PHASE_ARG="${3:-}"
 PLANNING_DIR=".vbw-planning"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # --- State detection ---
 has_project=false
@@ -49,8 +50,23 @@ uat_major_or_higher=false
 verify_target_phase=""
 verify_target_phase_dir=""
 verify_target_uat=""
+milestone_uat_issues=false
+milestone_uat_phase="none"
+milestone_uat_slug="none"
 
 if [ -d "$PLANNING_DIR" ]; then
+
+  # Canonical post-archive UAT recovery state from phase-detect.sh
+  _pd_out=$(bash "$SCRIPT_DIR/phase-detect.sh" 2>/dev/null || true)
+  if [ -n "$_pd_out" ]; then
+    _pd_milestone_uat=$(echo "$_pd_out" | grep -m1 '^milestone_uat_issues=' | sed 's/^[^=]*=//' || true)
+    _pd_milestone_phase=$(echo "$_pd_out" | grep -m1 '^milestone_uat_phase=' | sed 's/^[^=]*=//' || true)
+    _pd_milestone_slug=$(echo "$_pd_out" | grep -m1 '^milestone_uat_slug=' | sed 's/^[^=]*=//' || true)
+
+    [ -n "${_pd_milestone_uat:-}" ] && milestone_uat_issues="$_pd_milestone_uat"
+    [ -n "${_pd_milestone_phase:-}" ] && milestone_uat_phase="$_pd_milestone_phase"
+    [ -n "${_pd_milestone_slug:-}" ] && milestone_uat_slug="$_pd_milestone_slug"
+  fi
 
   # Root-canonical phases directory (no ACTIVE indirection)
   PHASES_DIR="$PLANNING_DIR/phases"
@@ -267,6 +283,18 @@ suggest() {
   echo "  $1"
 }
 
+suggest_milestone_recovery() {
+  if [ "$milestone_uat_issues" = true ]; then
+    if [ "$milestone_uat_slug" != "none" ] && [ "$milestone_uat_phase" != "none" ]; then
+      suggest "/vbw:vibe -- Milestone UAT recovery pending (${milestone_uat_slug}, Phase ${milestone_uat_phase})"
+    else
+      suggest "/vbw:vibe -- Milestone UAT recovery pending"
+    fi
+    return 0
+  fi
+  return 1
+}
+
 case "$CMD" in
   init)
     suggest "/vbw:vibe -- Define your project and start building"
@@ -300,11 +328,17 @@ case "$CMD" in
           suggest "/vbw:verify -- Walk through changes before continuing"
         fi
         if [ "$all_done" = true ]; then
-          if [ "$deviation_count" -eq 0 ]; then
-            suggest "/vbw:vibe --archive -- All phases complete, zero deviations"
+          if ! suggest_milestone_recovery; then
+            if [ "$deviation_count" -eq 0 ]; then
+              suggest "/vbw:vibe --archive -- All phases complete, zero deviations"
+            else
+              suggest "/vbw:vibe --archive -- Archive completed work ($deviation_count deviation(s) logged)"
+              suggest "/vbw:qa -- Review before archiving"
+            fi
+          elif [ "$deviation_count" -gt 0 ]; then
+            suggest "/vbw:qa -- Review remediation scope before resuming new work"
           else
-            suggest "/vbw:vibe --archive -- Archive completed work ($deviation_count deviation(s) logged)"
-            suggest "/vbw:qa -- Review before archiving"
+            :
           fi
         elif [ -n "$next_unbuilt" ] || [ -n "$next_unplanned" ]; then
           target="${next_unbuilt:-$next_unplanned}"
@@ -345,10 +379,14 @@ case "$CMD" in
           suggest "/vbw:verify -- Walk through changes manually"
         fi
         if [ "$all_done" = true ]; then
-          if [ "$deviation_count" -eq 0 ]; then
-            suggest "/vbw:vibe --archive -- All phases complete, zero deviations"
+          if ! suggest_milestone_recovery; then
+            if [ "$deviation_count" -eq 0 ]; then
+              suggest "/vbw:vibe --archive -- All phases complete, zero deviations"
+            else
+              suggest "/vbw:vibe --archive -- Archive completed work ($deviation_count deviation(s) logged)"
+            fi
           else
-            suggest "/vbw:vibe --archive -- Archive completed work ($deviation_count deviation(s) logged)"
+            :
           fi
         else
           target="${next_unbuilt:-$next_unplanned}"
@@ -399,7 +437,9 @@ case "$CMD" in
     case "$effective_result" in
       pass)
         if [ "$all_done" = true ]; then
-          suggest "/vbw:vibe --archive -- All verified, ready to ship"
+          if ! suggest_milestone_recovery; then
+            suggest "/vbw:vibe --archive -- All verified, ready to ship"
+          fi
         else
           suggest "/vbw:vibe -- Continue to next phase"
         fi
@@ -442,10 +482,14 @@ case "$CMD" in
 
   status)
     if [ "$all_done" = true ]; then
-      if [ "$deviation_count" -eq 0 ]; then
-        suggest "/vbw:vibe --archive -- All phases complete, zero deviations"
+      if ! suggest_milestone_recovery; then
+        if [ "$deviation_count" -eq 0 ]; then
+          suggest "/vbw:vibe --archive -- All phases complete, zero deviations"
+        else
+          suggest "/vbw:vibe --archive -- Archive completed work"
+        fi
       else
-        suggest "/vbw:vibe --archive -- Archive completed work"
+        :
       fi
     elif [ -n "$next_unbuilt" ] || [ -n "$next_unplanned" ]; then
       target="${next_unbuilt:-$next_unplanned}"

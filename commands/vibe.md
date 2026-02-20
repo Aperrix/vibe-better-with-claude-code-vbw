@@ -47,7 +47,7 @@ Check $ARGUMENTS for flags. If any mode flag is present, go directly to that mod
 Behavior modifiers (combinable with mode flags):
 - `--effort <level>`: thorough|balanced|fast|turbo (overrides config)
 - `--skip-qa`: skip post-build QA
-- `--skip-audit`: skip pre-archive audit
+- `--skip-audit`: skip non-UAT pre-archive audit checks (hard UAT gate still enforced)
 - `--yolo`: skip all confirmation gates, auto-loop remaining phases
 - `--plan=NN`: execute single plan (bypasses wave grouping)
 - Bare integer `N`: targets phase N (works with any mode flag)
@@ -263,7 +263,11 @@ This mode handles the case where a milestone was archived before UAT issues were
 3. Present options via AskUserQuestion:
    - **"Create a remediation milestone"** (recommended for major/critical): Scope a new milestone with a single phase targeting the UAT issues. Auto-populate the phase goal from the UAT issue descriptions. Route to Scope mode with pre-filled phase data.
    - **"Start fresh with new work"**: Acknowledge the stale UAT issues and proceed as if all_done. The user can define new work via `/vbw:vibe` with arguments.
-4. If the user chooses remediation: create a new phase directory under the active `phases/` dir, copy relevant context from the milestone's UAT report, and route to Plan mode for the new phase.
+4. If the user chooses remediation: create the new phase via script (not manual orchestration):
+  ```bash
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/create-remediation-phase.sh .vbw-planning "{milestone_uat_phase_dir}"
+  ```
+  Then route to Plan mode for the created phase.
 
 ### Mode: Plan
 
@@ -278,7 +282,7 @@ This mode handles the case where a milestone was archived before UAT issues were
    - **If missing:** Spawn Scout agent to research the phase goal, requirements, and relevant codebase patterns. Scout returns structured findings with sections: `## Findings`, `## Relevant Patterns`, `## Risks`, `## Recommendations`. The **orchestrator** (not Scout) writes the returned findings to `{phase-dir}/{phase}-RESEARCH.md`. Scout has `disallowedTools: Write` (platform-enforced) and cannot write files. Resolve Scout model:
      ```bash
      SCOUT_MODEL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-   SCOUT_MAX_TURNS=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}")
+     SCOUT_MAX_TURNS=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}")
      ```
    Pass `model: "${SCOUT_MODEL}"` and `maxTurns: ${SCOUT_MAX_TURNS}` to the Task tool.
    - **If exists:** Include it in Lead's context for incremental refresh. Lead may update RESEARCH.md if new information emerges.
@@ -329,7 +333,7 @@ This mode handles the case where a milestone was archived before UAT issues were
    MODEL_PROFILE=$(jq -r '.model_profile // "quality"' .vbw-planning/config.json)
    ```
    Display Phase Banner with plan list, effort level, and model profile:
-   ```
+    ```text
    Phase {N}: {name}
    Plans: {N}
      {plan}: {title} (wave {W}, {N} tasks)
@@ -431,6 +435,13 @@ Completed ([x] in roadmap): STOP "Cannot remove completed Phase {N}."
 No roadmap: STOP "No milestones configured. Run `/vbw:vibe` to bootstrap."
 No work (no SUMMARY.md files): STOP "Nothing to ship."
 
+**Hard UAT gate (always, non-bypassable):**
+Before any audit/bypass handling, run:
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/archive-uat-guard.sh
+```
+If exit code is 2: STOP. Unresolved UAT (active or milestone) blocks archive regardless of `--skip-audit` or `--force`.
+
 **Pre-gate audit (unless --skip-audit or --force):**
 Run 7-point audit matrix:
 1. Roadmap completeness: every phase has real goal (not TBD/empty)
@@ -444,7 +455,7 @@ FAIL -> STOP with remediation suggestions. WARN -> proceed with warnings.
 
 **Steps:**
 1. Derive milestone slug from ROADMAP.md phase names (kebab-case, max 60 chars). Override with --tag if provided.
-2. Parse args: --tag=vN.N.N (custom tag), --no-tag (skip), --force (skip audit).
+2. Parse args: --tag=vN.N.N (custom tag), --no-tag (skip), --force (skip non-UAT audit).
 3. Compute summary: from ROADMAP (phases), SUMMARY.md files (tasks/commits/deviations), REQUIREMENTS.md (satisfied count).
 4. **Rolling summary (conditional):** If `rolling_summary=true` in config:
    ```bash

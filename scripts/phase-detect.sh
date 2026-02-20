@@ -67,9 +67,25 @@ echo "phases_dir=$PHASES_DIR"
 # --- Shipped milestones detection ---
 HAS_SHIPPED_MILESTONES=false
 NEEDS_MILESTONE_RENAME=false
+MILESTONE_SCAN_DIRS=""
 if [ -d "$PLANNING_DIR/milestones" ]; then
-  for _shipped in "$PLANNING_DIR"/milestones/*/SHIPPED.md; do
-    [ -f "$_shipped" ] && HAS_SHIPPED_MILESTONES=true && break
+  MILESTONE_DIRS=$(ls -d "$PLANNING_DIR"/milestones/*/ 2>/dev/null | (sort -V 2>/dev/null || sort))
+  for _ms_dir in $MILESTONE_DIRS; do
+    [ -d "$_ms_dir" ] || continue
+
+    # Canonical archived milestone marker
+    if [ -f "${_ms_dir}SHIPPED.md" ]; then
+      HAS_SHIPPED_MILESTONES=true
+      MILESTONE_SCAN_DIRS="${MILESTONE_SCAN_DIRS}${MILESTONE_SCAN_DIRS:+ }$_ms_dir"
+      continue
+    fi
+
+    # Brownfield fallback: legacy milestones may be missing SHIPPED.md but still
+    # contain archived phase artifacts. Treat as shipped for recovery scanning.
+    if [ -d "${_ms_dir}phases" ] && ls -d "${_ms_dir}phases"/*/ >/dev/null 2>&1; then
+      HAS_SHIPPED_MILESTONES=true
+      MILESTONE_SCAN_DIRS="${MILESTONE_SCAN_DIRS}${MILESTONE_SCAN_DIRS:+ }$_ms_dir"
+    fi
   done
   [ -d "$PLANNING_DIR/milestones/default" ] && NEEDS_MILESTONE_RENAME=true
 fi
@@ -197,7 +213,12 @@ echo "uat_issues_major_or_higher=$UAT_ISSUES_MAJOR_OR_HIGHER"
 
 # --- Milestone UAT scanning (post-archive recovery) ---
 # When active phases have no work (all_done or no_phases) and no active UAT remediation,
-# scan the latest shipped milestone for unresolved UAT issues.
+# scan archived milestones for unresolved UAT issues.
+#
+# Selection rule (deterministic): scan milestone dirs in version/numeric order,
+# and keep the latest milestone that still has unresolved UAT. This preserves
+# discoverability when newer milestones are clean but older shipped milestones
+# still contain unresolved UAT issues.
 MILESTONE_UAT_ISSUES=false
 MILESTONE_UAT_PHASE="none"
 MILESTONE_UAT_SLUG="none"
@@ -205,17 +226,17 @@ MILESTONE_UAT_MAJOR_OR_HIGHER=false
 MILESTONE_UAT_PHASE_DIR="none"
 
 if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] || [ "$NEXT_PHASE_STATE" = "no_phases" ]; } && [ "$HAS_SHIPPED_MILESTONES" = true ]; then
-  # Find the latest shipped milestone (highest sort order)
-  LATEST_MILESTONE=""
-  for _ms_dir in "$PLANNING_DIR"/milestones/*/; do
+  for _ms_dir in $MILESTONE_SCAN_DIRS; do
     [ -d "$_ms_dir" ] || continue
-    [ -f "${_ms_dir}SHIPPED.md" ] || continue
-    LATEST_MILESTONE="$_ms_dir"
-  done
+    [ -d "${_ms_dir}phases" ] || continue
 
-  if [ -n "$LATEST_MILESTONE" ] && [ -d "${LATEST_MILESTONE}phases" ]; then
-    MS_SLUG=$(basename "$LATEST_MILESTONE")
-    MS_PHASE_DIRS=$(ls -d "${LATEST_MILESTONE}phases"/*/ 2>/dev/null | (sort -V 2>/dev/null || awk -F/ '{n=$(NF-1); gsub(/[^0-9].*/,"",n); print (n+0)"\t"$0}' | sort -n | cut -f2-))
+    MS_SLUG=$(basename "$_ms_dir")
+    MS_PHASE_DIRS=$(ls -d "${_ms_dir}phases"/*/ 2>/dev/null | (sort -V 2>/dev/null || awk -F/ '{n=$(NF-1); gsub(/[^0-9].*/,"",n); print (n+0)"\t"$0}' | sort -n | cut -f2-))
+
+    _ms_issue_found=false
+    _ms_issue_phase="none"
+    _ms_issue_phase_dir="none"
+    _ms_issue_major_or_higher=false
 
     for _ms_phase_dir in $MS_PHASE_DIRS; do
       [ -d "$_ms_phase_dir" ] || continue
@@ -233,10 +254,9 @@ if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] ||
       if [ -f "$_ms_uat" ]; then
         _ms_uat_status=$(grep -m1 '^status:' "$_ms_uat" 2>/dev/null | sed 's/status:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' || true)
         if [ "$_ms_uat_status" = "issues_found" ]; then
-          MILESTONE_UAT_ISSUES=true
-          MILESTONE_UAT_PHASE="$_ms_num"
-          MILESTONE_UAT_SLUG="$MS_SLUG"
-          MILESTONE_UAT_PHASE_DIR="${_ms_phase_dir%/}"
+          _ms_issue_found=true
+          _ms_issue_phase="$_ms_num"
+          _ms_issue_phase_dir="${_ms_phase_dir%/}"
 
           _ms_critical=$(grep -Eci 'severity:\**[[:space:]]*\**[[:space:]]*critical' "$_ms_uat" || true)
           _ms_major=$(grep -Eci 'severity:\**[[:space:]]*\**[[:space:]]*major' "$_ms_uat" || true)
@@ -244,13 +264,22 @@ if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] ||
           _ms_tagged=$((_ms_critical + _ms_major + _ms_minor))
 
           if [ "$_ms_critical" -gt 0 ] || [ "$_ms_major" -gt 0 ] || [ "$_ms_tagged" -eq 0 ]; then
-            MILESTONE_UAT_MAJOR_OR_HIGHER=true
+            _ms_issue_major_or_higher=true
           fi
           break
         fi
       fi
     done
-  fi
+
+    if [ "$_ms_issue_found" = true ]; then
+      # Keep scanning: last match wins, so we surface the latest milestone with issues.
+      MILESTONE_UAT_ISSUES=true
+      MILESTONE_UAT_PHASE="$_ms_issue_phase"
+      MILESTONE_UAT_SLUG="$MS_SLUG"
+      MILESTONE_UAT_PHASE_DIR="$_ms_issue_phase_dir"
+      MILESTONE_UAT_MAJOR_OR_HIGHER="$_ms_issue_major_or_higher"
+    fi
+  done
 fi
 
 echo "milestone_uat_issues=$MILESTONE_UAT_ISSUES"

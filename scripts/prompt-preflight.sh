@@ -66,6 +66,7 @@ if [ -f "$PLANNING_DIR/.gsd-isolation" ]; then
 fi
 
 WARNING=""
+BLOCK_MSG=""
 
 # Check: /vbw:vibe --execute when no PLAN.md exists
 if echo "$PROMPT" | grep -q '/vbw:vibe.*--execute'; then
@@ -85,12 +86,33 @@ fi
 
 # Check: /vbw:vibe --archive with incomplete phases
 if echo "$PROMPT" | grep -q '/vbw:vibe.*--archive'; then
+  # Hard gate: unresolved UAT (active or milestone) blocks archive requests,
+  # including bypass attempts like --skip-audit / --force.
+  GUARD_SCRIPT="$(dirname "$0")/archive-uat-guard.sh"
+  if [ -f "$GUARD_SCRIPT" ]; then
+    GUARD_OUTPUT=$(bash "$GUARD_SCRIPT" 2>/dev/null)
+    GUARD_RC=$?
+    if [ "$GUARD_RC" -eq 2 ]; then
+      BLOCK_MSG="${GUARD_OUTPUT:-Archive blocked: unresolved UAT issues must be remediated before archiving.}"
+    fi
+  fi
+
   if [ -f "$PLANNING_DIR/STATE.md" ]; then
     INCOMPLETE=$(grep -c "status:.*incomplete\|status:.*in.progress\|status:.*pending" "$PLANNING_DIR/STATE.md" 2>/dev/null || echo 0)
     if [ "$INCOMPLETE" -gt 0 ]; then
       WARNING="$INCOMPLETE incomplete phase(s). Review STATE.md before shipping."
     fi
   fi
+fi
+
+if [ -n "$BLOCK_MSG" ]; then
+  jq -n --arg msg "$BLOCK_MSG" '{
+    "hookSpecificOutput": {
+      "hookEventName": "UserPromptSubmit",
+      "additionalContext": ("VBW pre-flight block: " + $msg)
+    }
+  }'
+  exit 2
 fi
 
 if [ -n "$WARNING" ]; then

@@ -300,3 +300,27 @@ EOF
   # Should show generic fix guidance
   [[ "$output" == *"/vbw:fix"* ]]
 }
+
+@test "suggest-next vibe all-done prefers milestone recovery over archive when archived UAT unresolved" {
+  cd "$TEST_TEMP_DIR"
+
+  # Active work is complete
+  local active_dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-core"
+  mkdir -p "$active_dir"
+  printf -- '---\nphase: 01\nplan: 01-01\n---\n' > "${active_dir}/01-01-PLAN.md"
+  printf -- '---\nstatus: complete\ndeviations: 0\n---\n' > "${active_dir}/01-01-SUMMARY.md"
+
+  # Archived milestone still has unresolved UAT
+  local ms_dir="$TEST_TEMP_DIR/.vbw-planning/milestones/01-foundation/phases/08-cost-basis"
+  mkdir -p "$ms_dir"
+  printf '# SHIPPED\n' > "$TEST_TEMP_DIR/.vbw-planning/milestones/01-foundation/SHIPPED.md"
+  printf -- '---\nphase: 08\nplan: 08-01\n---\n' > "${ms_dir}/08-01-PLAN.md"
+  printf -- '---\nstatus: complete\ndeviations: 0\n---\n' > "${ms_dir}/08-01-SUMMARY.md"
+  printf -- '---\nphase: 08\nstatus: issues_found\n---\nSeverity: major\n' > "${ms_dir}/08-UAT.md"
+
+  run bash "$SCRIPTS_DIR/suggest-next.sh" vibe pass
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Milestone UAT recovery pending"* ]]
+  [[ "$output" != *"/vbw:vibe --archive"* ]]
+}
