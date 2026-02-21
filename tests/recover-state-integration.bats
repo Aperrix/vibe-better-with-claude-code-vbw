@@ -371,6 +371,43 @@ EVENTS
   [ "$plan_10_status" = "complete" ]
 }
 
+@test "recover-state: malformed trailing matching line does not mask prior valid event" {
+  cd "$TEST_TEMP_DIR"
+  local tmp
+  tmp=$(mktemp)
+  jq '.event_recovery = true' .vbw-planning/config.json > "$tmp" && mv "$tmp" .vbw-planning/config.json
+
+  echo "title: Build UI" > .vbw-planning/phases/01-setup/01-01-PLAN.md
+  mkdir -p .vbw-planning/.events
+  cat > .vbw-planning/.events/event-log.jsonl <<'EVENTS'
+{"event":"plan_end","phase":1,"plan":1,"data":{"status":"complete"}}
+{"event":"plan_end","phase":1,"plan":1,"data":{"status":"failed"
+EVENTS
+
+  run bash "$SCRIPTS_DIR/recover-state.sh" 1 ".vbw-planning/phases"
+  [ "$status" -eq 0 ]
+
+  plan_status=$(echo "$output" | jq -r '.plans[] | select(.id == "01-01") | .status')
+  [ "$plan_status" = "complete" ]
+}
+
+@test "recover-state: latest valid plan_end status overrides SUMMARY status" {
+  cd "$TEST_TEMP_DIR"
+  local tmp
+  tmp=$(mktemp)
+  jq '.event_recovery = true' .vbw-planning/config.json > "$tmp" && mv "$tmp" .vbw-planning/config.json
+
+  echo "title: Build UI" > .vbw-planning/phases/01-setup/01-01-PLAN.md
+  echo "# Summary" > .vbw-planning/phases/01-setup/01-01-SUMMARY.md
+  mkdir -p .vbw-planning/.events
+  echo '{"event":"plan_end","phase":1,"plan":1,"data":{"status":"failed"}}' > .vbw-planning/.events/event-log.jsonl
+
+  run bash "$SCRIPTS_DIR/recover-state.sh" 1 ".vbw-planning/phases"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.plans[] | select(.id == "01-01") | .status == "failed"' >/dev/null
+  echo "$output" | jq -e '.status == "failed"' >/dev/null
+}
+
 @test "recover-state: non-numeric wave defaults to 1 instead of dropping plan" {
   cd "$TEST_TEMP_DIR"
   local tmp
@@ -451,4 +488,32 @@ STATE
   # not have touched it further (reconcile only runs on status=running)
   recovered_status=$(jq -r '.status' .vbw-planning/.execution-state.json 2>/dev/null)
   [ "$recovered_status" = "complete" ]
+}
+
+@test "session-start: non-numeric STATE phase prefers event-backed phase over highest numeric phase" {
+  cd "$TEST_TEMP_DIR"
+  local tmp
+  tmp=$(mktemp)
+  jq '.event_recovery = true' .vbw-planning/config.json > "$tmp" && mv "$tmp" .vbw-planning/config.json
+
+  # Non-numeric phase forces fallback path
+  cat > .vbw-planning/STATE.md <<'STATE'
+Phase: X of 2 (Setup)
+Status: in-progress
+Progress: 50%
+STATE
+
+  # Add a higher-numbered future phase with plans (old logic picked this)
+  mkdir -p .vbw-planning/phases/02-build
+  echo "# Plan" > .vbw-planning/phases/02-build/02-01-PLAN.md
+
+  # Events exist only for phase 1
+  mkdir -p .vbw-planning/.events
+  echo '{"event":"plan_end","phase":1,"plan":1,"data":{"status":"complete"}}' > .vbw-planning/.events/event-log.jsonl
+
+  run bash "$SCRIPTS_DIR/session-start.sh"
+  [ "$status" -eq 0 ]
+
+  recovered_phase=$(jq -r '.phase' .vbw-planning/.execution-state.json 2>/dev/null)
+  [ "$recovered_phase" = "1" ]
 }

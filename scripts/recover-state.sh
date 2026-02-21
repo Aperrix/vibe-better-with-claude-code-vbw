@@ -32,6 +32,24 @@ fi
 # Need jq for JSON processing
 command -v jq &>/dev/null || { echo "{}"; exit 0; }
 
+# Find latest valid plan_end status for a phase/plan pair.
+# Uses jq fromjson? so malformed trailing lines do not mask earlier valid events.
+latest_plan_event_status() {
+  _events_file="$1"
+  _phase="$2"
+  _plan="$3"
+  jq -Rr \
+    --argjson phase "$_phase" \
+    --argjson plan "$_plan" \
+    '
+      fromjson?
+      | select(.event == "plan_end")
+      | select((((.phase | tostring | tonumber?) // -1) == $phase))
+      | select((((.plan  | tostring | tonumber?) // -1) == $plan))
+      | (.data.status // empty)
+    ' "$_events_file" 2>/dev/null | tail -n 1
+}
+
 # Find phase directory
 PHASES_DIR="${2:-${PLANNING_DIR}/phases}"
 PHASE_DIR=""
@@ -59,15 +77,13 @@ for plan_file in "$PHASE_DIR"/*-PLAN.md; do
     PLAN_STATUS="pending"
   fi
 
-  # Check event log for plan_end events
-  if [ -f "$EVENTS_FILE" ] && [ "$PLAN_STATUS" = "pending" ]; then
+  # Check event log for plan_end events.
+  # Policy: latest valid event is authoritative over SUMMARY.md, which may be stale.
+  if [ -f "$EVENTS_FILE" ]; then
     # Strip leading zeros — log-event.sh writes bare integers ("plan":1 not "plan":01)
     PLAN_NUM=$(echo "$PLAN_ID" | sed 's/^[0-9]*-//' | sed 's/^0*//')
     [ -z "$PLAN_NUM" ] && PLAN_NUM="0"
-    EVENT_STATUS=$(grep "\"plan_end\"" "$EVENTS_FILE" 2>/dev/null | \
-      grep -E "\"phase\"[[:space:]]*:[[:space:]]*${PHASE}([[:space:]]*[,}])" 2>/dev/null | \
-      grep -E "\"plan\"[[:space:]]*:[[:space:]]*${PLAN_NUM}([[:space:]]*[,}])" 2>/dev/null | \
-      tail -1 | jq -r '.data.status // "unknown"' 2>/dev/null) || EVENT_STATUS=""
+    EVENT_STATUS=$(latest_plan_event_status "$EVENTS_FILE" "$PHASE" "$PLAN_NUM") || EVENT_STATUS=""
     [ "$EVENT_STATUS" = "complete" ] && PLAN_STATUS="complete"
     [ "$EVENT_STATUS" = "failed" ] && PLAN_STATUS="failed"
   fi
