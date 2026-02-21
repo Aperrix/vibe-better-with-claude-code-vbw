@@ -157,8 +157,13 @@ if [ -d "$PLANNING_DIR" ]; then
           if [ "$context_files" -eq 0 ]; then
             next_undiscussed="$phase_num"
           elif [ -z "$next_preseeded" ]; then
-            # CONTEXT.md exists without PLAN.md — discussion was pre-seeded (e.g., remediation)
-            next_preseeded="$phase_num"
+            # Only flag as pre-seeded if CONTEXT.md has pre_seeded: true frontmatter
+            # (written by create-remediation-phase.sh). User-discussed CONTEXT.md
+            # files from the discussion engine do not have this field.
+            ctx_file=$(ls "$dir"[0-9]*-CONTEXT.md 2>/dev/null | head -1)
+            if [ -n "$ctx_file" ] && grep -q '^pre_seeded: true' "$ctx_file" 2>/dev/null; then
+              next_preseeded="$phase_num"
+            fi
           fi
         fi
         next_unplanned="$phase_num"
