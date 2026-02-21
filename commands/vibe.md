@@ -72,9 +72,11 @@ ALWAYS confirm interpreted intent via AskUserQuestion before executing.
 
 If no $ARGUMENTS, evaluate phase-detect.sh output. First match determines mode:
 
-**Phase-detect error guard (NON-NEGOTIABLE):** If the output contains `phase_detect_error=true`, display:
-"⚠ Phase detection failed. Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/phase-detect.sh` manually to debug."
-STOP. Do NOT manually scan for project state or improvise routing — incorrect routing can corrupt archived milestones.
+**Phase-detect error guard:** If the output contains `phase_detect_error=true`, the template-level script expansion failed (common in local dev mode where the marketplace cache is empty). Recover by running phase-detect.sh directly via the Bash tool:
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/phase-detect.sh
+```
+If that succeeds, use its output for routing below. If the Bash tool execution also fails (e.g. `CLAUDE_PLUGIN_ROOT` is not set), manually scan `.vbw-planning/` to determine state — but **never route into `.vbw-planning/milestones/`** directories (those are archived and read-only).
 
 | Priority | Condition | Mode | Confirmation |
 |---|---|---|---|
