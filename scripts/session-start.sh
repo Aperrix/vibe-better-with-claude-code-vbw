@@ -579,6 +579,9 @@ else
       needs_uat_remediation)
         NEXT_ACTION="/vbw:vibe (Phase ${PD_UAT_ISSUES_PHASE:-$PD_NEXT_PHASE} has unresolved UAT issues, continue remediation)"
         ;;
+      needs_discussion)
+        NEXT_ACTION="/vbw:vibe (Phase ${PD_NEXT_PHASE} needs discussion before planning)"
+        ;;
       needs_plan_and_execute)
         NEXT_ACTION="/vbw:vibe (Phase ${PD_NEXT_PHASE} needs planning)"
         ;;
