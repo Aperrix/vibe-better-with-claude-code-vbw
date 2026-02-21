@@ -120,7 +120,7 @@ case "$CMD" in
     # Appends UAT issues to the existing CONTEXT (preserving original
     # discussion context) and adds pre_seeded: true to frontmatter.
     context_file=$(find "$PHASE_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-CONTEXT.md' 2>/dev/null | sort | head -1)
-    uat_file=$(find "$PHASE_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-UAT.md' 2>/dev/null | sort | tail -1)
+    uat_file=$(find "$PHASE_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-UAT.md' ! -name '*SOURCE-UAT.md' 2>/dev/null | sort | tail -1)
 
     if [ -n "$uat_file" ] && [ -f "$uat_file" ]; then
       uat_content=$(cat "$uat_file")
