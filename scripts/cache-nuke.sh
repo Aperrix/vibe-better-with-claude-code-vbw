@@ -32,7 +32,10 @@ if [[ -d "$PLUGIN_CACHE_DIR" ]]; then
     if [[ "$COUNT" -gt 1 ]]; then
       TO_REMOVE=$(echo "$VERSIONS" | head -n $((COUNT - 1)))
       versions_removed=$((COUNT - 1))
-      echo "$TO_REMOVE" | while IFS= read -r dir; do rm -rf "$dir" 2>/dev/null; done
+      echo "$TO_REMOVE" | while IFS= read -r dir; do
+        [ -L "${dir%/}" ] && continue  # Skip local dev symlinks
+        rm -rf "$dir" 2>/dev/null
+      done
       wiped_plugin_cache=true
     fi
   else

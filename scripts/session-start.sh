@@ -237,6 +237,12 @@ if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "$CLAUDE_PLUGIN_ROOT" ]; then
     mkdir -p "$CACHE_DIR"
     ln -sfn "$CLAUDE_PLUGIN_ROOT" "$CACHE_DIR/local"
   fi
+else
+  # Not in local dev mode — remove stale local symlink to prevent prod sessions
+  # from silently resolving scripts from a developer's repo checkout.
+  if [ -L "$CACHE_DIR/local" ]; then
+    rm -f "$CACHE_DIR/local"
+  fi
 fi
 
 # --- Clean old cache versions (keep only latest) ---
@@ -288,7 +294,8 @@ if [ -d "$MKT_DIR/.git" ] && [ -d "$CACHE_DIR" ]; then
   # Content staleness: compare command counts
   if [ -d "$MKT_DIR/commands" ] && [ -d "$CACHE_DIR" ]; then
     LATEST_VER=$(ls -d "$CACHE_DIR"/*/ 2>/dev/null | sort -V | tail -1)
-    if [ -n "$LATEST_VER" ] && [ -d "${LATEST_VER}commands" ]; then
+    if [ -n "$LATEST_VER" ] && [ -d "${LATEST_VER}commands" ] && [ ! -L "${LATEST_VER%/}" ]; then
+      # Skip staleness check for local dev symlinks — command counts differ during development.
       # zsh compat: bare globs error before ls runs in zsh (nomatch). Use ls dir | grep.
       # shellcheck disable=SC2010
       MKT_CMD_COUNT=$(ls -1 "$MKT_DIR/commands/" 2>/dev/null | grep '\.md$' | wc -l | tr -d ' ')
