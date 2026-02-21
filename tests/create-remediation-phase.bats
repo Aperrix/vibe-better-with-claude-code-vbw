@@ -315,3 +315,69 @@ EOF
   # Phase 2 added as Pending in STATE.md
   grep -q '^- \*\*Phase 2:\*\* Pending$' .vbw-planning/STATE.md
 }
+
+@test "create-remediation-phase preserves non-canonical ROADMAP progress row formats" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  # Simulate brownfield formatting variance: leading spaces + zero-padded phase id
+  sed -i '' 's/| 1 | Pending | 0 | 0 | 0 |/  | 01 | In Progress | 2 | 5 | 3 |/' .vbw-planning/ROADMAP.md
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  grep -q '^  | 01 | In Progress | 2 | 5 | 3 |$' .vbw-planning/ROADMAP.md
+  ! grep -q '^| 1 | Pending | 0 | 0 | 0 |$' .vbw-planning/ROADMAP.md
+}
+
+@test "create-remediation-phase repairs missing STATE phase bullets for remediation milestone" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  # Simulate malformed/brownfield STATE.md: remediation milestone, no phase bullets.
+  cat > .vbw-planning/STATE.md <<'EOF'
+# VBW State
+
+**Project:** Test Project
+**Milestone:** UAT Remediation
+
+## Phase Status
+
+## Key Decisions
+| Decision | Date | Rationale |
+|----------|------|-----------|
+| _(No decisions yet)_ | | |
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"integer expression expected"* ]]
+  grep -q '^- \*\*Phase 1:\*\* Pending$' .vbw-planning/STATE.md
+}

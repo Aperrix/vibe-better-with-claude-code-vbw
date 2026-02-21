@@ -69,6 +69,36 @@ humanize_slug() {
   printf '%s' "$text"
 }
 
+find_progress_row_for_phase() {
+  local rows="$1"
+  local target_phase="$2"
+
+  printf '%s\n' "$rows" | awk -v target="$target_phase" '
+    function trim(value) {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+      return value
+    }
+
+    {
+      row = $0
+      if (row !~ /^[[:space:]]*\|/) {
+        next
+      }
+
+      split(row, cols, /\|/)
+      if (length(cols) < 3) {
+        next
+      }
+
+      phase = trim(cols[2])
+      if (phase ~ /^[0-9]+$/ && (phase + 0) == (target + 0)) {
+        print row
+        exit
+      }
+    }
+  '
+}
+
 all_active_phases_are_remediation() {
   local phases_dir="$PLANNING_DIR/phases"
   local canonical_count=0
@@ -169,7 +199,7 @@ seed_remediation_roadmap_and_state() {
     # progress when re-entering idempotently or adding new phases).
     existing_progress=""
     if [ -f "$roadmap_file" ]; then
-      existing_progress=$(grep -E '^\|[[:space:]]*[0-9]+[[:space:]]*\|' "$roadmap_file" 2>/dev/null || true)
+      existing_progress=$(grep -E '^[[:space:]]*\|[[:space:]]*[0-9]+[[:space:]]*\|' "$roadmap_file" 2>/dev/null || true)
     fi
 
     {
@@ -184,7 +214,7 @@ seed_remediation_roadmap_and_state() {
       echo "|-------|--------|-------|-------|---------|"
       for i in $(seq 0 $((phase_count - 1))); do
         phase_num=$((i + 1))
-        preserved=$(echo "$existing_progress" | grep -E "^\|[[:space:]]*${phase_num}[[:space:]]*\|" | head -1 || true)
+        preserved=$(find_progress_row_for_phase "$existing_progress" "$phase_num")
         if [ -n "$preserved" ]; then
           echo "$preserved"
         else
@@ -245,19 +275,44 @@ seed_remediation_roadmap_and_state() {
     # Preserve existing STATE.md phase statuses when the remediation milestone
     # is already seeded (avoid resetting progress on re-entry or phase addition).
     if [ -f "$state_file" ] && grep -q '^\*\*Milestone:\*\* UAT Remediation$' "$state_file" 2>/dev/null; then
-      existing_phase_lines=$(grep -cE '^\- \*\*Phase [0-9]+:\*\*' "$state_file" 2>/dev/null || echo 0)
+      existing_phase_lines=$(awk '
+        BEGIN { count = 0 }
+        /^- \*\*Phase [0-9]+:\*\*/ { count++ }
+        END { print count + 0 }
+      ' "$state_file" 2>/dev/null)
+      existing_phase_lines="${existing_phase_lines:-0}"
       if [ "$phase_count" -gt "$existing_phase_lines" ]; then
-        # Append new phase entries after the last existing "- **Phase N:**" line
+        # Append/repair phase entries after the last existing "- **Phase N:**"
+        # line, or directly after "## Phase Status" when bullet lines are
+        # missing in brownfield STATE.md files.
         awk -v start="$((existing_phase_lines + 1))" -v end="$phase_count" '
+          /^## Phase Status$/ { phase_status_header = NR }
           /^- \*\*Phase [0-9]+:\*\*/ { last_phase_line = NR }
           { lines[NR] = $0; count = NR }
           END {
+            inserted = 0
             for (i = 1; i <= count; i++) {
               print lines[i]
-              if (i == last_phase_line) {
+              if (last_phase_line > 0 && i == last_phase_line) {
                 for (p = start; p <= end; p++) {
                   print "- **Phase " p ":** Pending"
                 }
+                inserted = 1
+              } else if (last_phase_line == 0 && phase_status_header > 0 && i == phase_status_header) {
+                for (p = start; p <= end; p++) {
+                  print "- **Phase " p ":** Pending"
+                }
+                inserted = 1
+              }
+            }
+
+            if (!inserted && start <= end) {
+              if (count > 0 && lines[count] !~ /^$/) {
+                print ""
+              }
+              print "## Phase Status"
+              for (p = start; p <= end; p++) {
+                print "- **Phase " p ":** Pending"
               }
             }
           }
