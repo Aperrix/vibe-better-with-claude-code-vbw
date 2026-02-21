@@ -29,6 +29,212 @@ if [[ ! -d "$MILESTONE_PHASE_DIR" ]]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+list_child_dirs_sorted() {
+  local parent="$1"
+  [ -d "$parent" ] || return 0
+
+  find "$parent" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null |
+    (sort -V 2>/dev/null || awk -F/ '{n=$NF; gsub(/[^0-9].*/,"",n); if (n == "") n=0; print (n+0)"\t"$0}' | sort -n -k1,1 -k2,2 | cut -f2-)
+}
+
+extract_frontmatter_value() {
+  local file="$1"
+  local key="$2"
+
+  [ -f "$file" ] || return 0
+
+  awk -v k="$key" '
+    NR == 1 && /^---[[:space:]]*$/ { in_fm = 1; next }
+    in_fm && /^---[[:space:]]*$/ { exit }
+    in_fm {
+      pattern = "^" k "[[:space:]]*:[[:space:]]*"
+      if ($0 ~ pattern) {
+        value = $0
+        sub(pattern, "", value)
+        gsub(/[[:space:]]+$/, "", value)
+        gsub(/^"|"$/, "", value)
+        print value
+        exit
+      }
+    }
+  ' "$file" 2>/dev/null || true
+}
+
+humanize_slug() {
+  local text="$1"
+  text=$(printf '%s' "$text" | tr '-' ' ')
+  text=$(printf '%s' "$text" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')
+  printf '%s' "$text"
+}
+
+all_active_phases_are_remediation() {
+  local phases_dir="$PLANNING_DIR/phases"
+  local canonical_count=0
+
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    base=$(basename "$dir")
+    num=$(echo "$base" | sed 's/[^0-9].*//')
+    if [[ -z "$num" || ! "$num" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
+    canonical_count=$((canonical_count + 1))
+    slug=$(echo "$base" | sed 's/^[0-9]*-//')
+    case "$slug" in
+      remediate-*) ;;
+      *) return 1 ;;
+    esac
+  done < <(list_child_dirs_sorted "$phases_dir")
+
+  [ "$canonical_count" -gt 0 ]
+}
+
+extract_project_name() {
+  local project_file="$PLANNING_DIR/PROJECT.md"
+  local project_name="VBW Project"
+
+  if [ -f "$project_file" ]; then
+    heading=$(awk '/^# / {sub(/^# /, "", $0); print; exit }' "$project_file" 2>/dev/null || true)
+    if [ -n "$heading" ]; then
+      project_name="$heading"
+    fi
+  fi
+
+  printf '%s' "$project_name"
+}
+
+seed_remediation_roadmap_and_state() {
+  local phases_dir="$PLANNING_DIR/phases"
+  local roadmap_file="$PLANNING_DIR/ROADMAP.md"
+  local state_file="$PLANNING_DIR/STATE.md"
+
+  all_active_phases_are_remediation || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  phases_json=$(mktemp)
+  printf '[]' > "$phases_json"
+
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    [ -d "$dir" ] || continue
+
+    base=$(basename "$dir")
+    num=$(echo "$base" | sed 's/[^0-9].*//')
+    if [[ -z "$num" || ! "$num" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
+
+    slug=$(echo "$base" | sed 's/^[0-9]*-//')
+    phase_name="$(humanize_slug "$slug")"
+
+    ctx_file=$(ls -1 "$dir"/[0-9]*-CONTEXT.md 2>/dev/null | sort | head -1 || true)
+    source_phase=$(extract_frontmatter_value "$ctx_file" "source_phase")
+    source_milestone=$(extract_frontmatter_value "$ctx_file" "source_milestone")
+
+    if [ -n "$source_phase" ]; then
+      source_phase_human=$(humanize_slug "${source_phase#*-}")
+      [ -n "$source_phase_human" ] && phase_name="$source_phase_human"
+    fi
+
+    if [ -z "$source_milestone" ]; then
+      source_milestone="archived milestone"
+    fi
+    if [ -z "$source_phase" ]; then
+      source_phase="$base"
+    fi
+
+    goal="Resolve unresolved UAT issues from ${source_milestone} (${source_phase})."
+    success_1="All source UAT issues for ${source_phase} are fixed and re-verified."
+    success_2="No regressions are introduced while remediating ${source_phase}."
+
+    phase_obj=$(jq -n \
+      --arg name "$phase_name" \
+      --arg goal "$goal" \
+      --arg req "REQ-UAT" \
+      --arg success1 "$success_1" \
+      --arg success2 "$success_2" \
+      '{name: $name, goal: $goal, requirements: [$req], success_criteria: [$success1, $success2]}')
+
+    updated=$(jq --argjson phase "$phase_obj" '. + [$phase]' "$phases_json" 2>/dev/null || echo "")
+    if [ -n "$updated" ]; then
+      printf '%s\n' "$updated" > "$phases_json"
+    fi
+  done < <(list_child_dirs_sorted "$phases_dir")
+
+  phase_count=$(jq 'length' "$phases_json" 2>/dev/null || echo 0)
+  if [ "$phase_count" -gt 0 ]; then
+    {
+      echo "# UAT Remediation Roadmap"
+      echo ""
+      echo "**Goal:** Resolve unresolved UAT issues recovered from archived milestone phases."
+      echo ""
+      echo "**Scope:** ${phase_count} phases"
+      echo ""
+      echo "## Progress"
+      echo "| Phase | Status | Plans | Tasks | Commits |"
+      echo "|-------|--------|-------|-------|---------|"
+      for i in $(seq 0 $((phase_count - 1))); do
+        phase_num=$((i + 1))
+        echo "| ${phase_num} | Pending | 0 | 0 | 0 |"
+      done
+      echo ""
+      echo "---"
+      echo ""
+      echo "## Phase List"
+      for i in $(seq 0 $((phase_count - 1))); do
+        phase_num=$((i + 1))
+        phase_name=$(jq -r ".[$i].name" "$phases_json")
+        phase_slug=$(printf '%s' "$phase_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')
+        echo "- [ ] [Phase ${phase_num}: ${phase_name}](#phase-${phase_num}-${phase_slug})"
+      done
+      echo ""
+      echo "---"
+      echo ""
+
+      for i in $(seq 0 $((phase_count - 1))); do
+        phase_num=$((i + 1))
+        phase_name=$(jq -r ".[$i].name" "$phases_json")
+        phase_goal=$(jq -r ".[$i].goal" "$phases_json")
+        phase_reqs=$(jq -r ".[$i].requirements // [] | join(\", \")" "$phases_json")
+        criteria_count=$(jq ".[$i].success_criteria // [] | length" "$phases_json")
+
+        echo "## Phase ${phase_num}: ${phase_name}"
+        echo ""
+        echo "**Goal:** ${phase_goal}"
+        echo ""
+        if [ -n "$phase_reqs" ]; then
+          echo "**Requirements:** ${phase_reqs}"
+          echo ""
+        fi
+        echo "**Success Criteria:**"
+        for j in $(seq 0 $((criteria_count - 1))); do
+          criterion=$(jq -r ".[$i].success_criteria[$j]" "$phases_json")
+          echo "- ${criterion}"
+        done
+        echo ""
+        if [ "$phase_num" -eq 1 ]; then
+          echo "**Dependencies:** None"
+        else
+          echo "**Dependencies:** Phase $((phase_num - 1))"
+        fi
+        echo ""
+
+        if [ "$i" -lt $((phase_count - 1)) ]; then
+          echo "---"
+          echo ""
+        fi
+      done
+    } > "$roadmap_file"
+
+    project_name=$(extract_project_name)
+    bash "$SCRIPT_DIR/bootstrap/bootstrap-state.sh" "$state_file" "$project_name" "UAT Remediation" "$phase_count"
+  fi
+
+  rm -f "$phases_json"
+}
+
 # Idempotency: if this milestone phase already maps to a previously created
 # remediation phase dir, return that mapping instead of creating duplicates.
 EXISTING_MARKER_FILE="$MILESTONE_PHASE_DIR/.remediated"
@@ -42,6 +248,7 @@ if [[ -f "$EXISTING_MARKER_FILE" ]]; then
     else
       EXISTING_SOURCE_UAT_OUT="none"
     fi
+    seed_remediation_roadmap_and_state
     echo "phase=${EXISTING_PHASE}"
     echo "phase_dir=${EXISTING_TARGET_DIR}"
     echo "source_uat=${EXISTING_SOURCE_UAT_OUT}"
@@ -148,6 +355,8 @@ fi
 # Mark the source milestone phase as remediated so phase-detect.sh
 # won't trigger repeated milestone UAT recovery for the same issues.
 echo "${TARGET_PHASE_DIR}" > "$MILESTONE_PHASE_DIR/.remediated"
+
+seed_remediation_roadmap_and_state
 
 echo "phase=${NEXT_PHASE_PADDED}"
 echo "phase_dir=${TARGET_PHASE_DIR}"
