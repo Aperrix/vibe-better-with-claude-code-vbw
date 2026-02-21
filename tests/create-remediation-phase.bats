@@ -116,8 +116,9 @@ EOF
   second_phase_dir=$(echo "$output" | grep '^phase_dir=' | sed 's/^phase_dir=//')
 
   [ "$first_phase_dir" = "$second_phase_dir" ]
-  # Ensure no second remediation phase directory was created.
-  [ "$(find .vbw-planning/phases -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" -eq 1 ]
+  # Ensure no second numbered remediation phase directory was created.
+  [ -d .vbw-planning/phases/01-remediate-01-arch-api ]
+  [ ! -d .vbw-planning/phases/02-remediate-01-arch-api ]
 }
 
 @test "create-remediation-phase writes UAT content verbatim without shell expansion" {
@@ -171,4 +172,212 @@ EOF
   ctx_file=".vbw-planning/phases/01-remediate-01-arch-api/01-CONTEXT.md"
   [ -f "$ctx_file" ]
   grep -q '^pre_seeded: true' "$ctx_file"
+}
+
+@test "create-remediation-phase seeds ROADMAP.md and STATE.md for remediation flow" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+  cat > .vbw-planning/PROJECT.md <<'EOF'
+# Options Wheel Tracker
+EOF
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+
+  [ "$status" -eq 0 ]
+  [ -f .vbw-planning/ROADMAP.md ]
+  [ -f .vbw-planning/STATE.md ]
+
+  grep -q '^# UAT Remediation Roadmap$' .vbw-planning/ROADMAP.md
+  grep -q '^\*\*Milestone:\*\* UAT Remediation$' .vbw-planning/STATE.md
+  grep -q '^\*\*Project:\*\* Options Wheel Tracker$' .vbw-planning/STATE.md
+}
+
+@test "create-remediation-phase keeps remediation ROADMAP.md in sync across multiple phases" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+  mkdir -p .vbw-planning/milestones/01-arch/phases/04-ui
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  cat > .vbw-planning/milestones/01-arch/phases/04-ui/04-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/04-ui
+  [ "$status" -eq 0 ]
+
+  [ -f .vbw-planning/ROADMAP.md ]
+  [ "$(grep -Ec '^## Phase [0-9]+:' .vbw-planning/ROADMAP.md | tr -d ' ')" -eq 2 ]
+  grep -q '^| 1 | Pending | 0 | 0 | 0 |$' .vbw-planning/ROADMAP.md
+  grep -q '^| 2 | Pending | 0 | 0 | 0 |$' .vbw-planning/ROADMAP.md
+  grep -q '^- \*\*Phase 2:\*\* Pending$' .vbw-planning/STATE.md
+}
+
+@test "create-remediation-phase preserves existing ROADMAP.md progress on re-entry" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+  cat > .vbw-planning/PROJECT.md <<'EOF'
+# Test Project
+EOF
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  # First invocation creates the remediation phase
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  # Simulate progress by editing ROADMAP.md progress row
+  sed -i '' 's/| 1 | Pending | 0 | 0 | 0 |/| 1 | In Progress | 2 | 5 | 3 |/' .vbw-planning/ROADMAP.md
+
+  # Re-entry (idempotent): should preserve progress
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  # Progress row must be preserved, not reset
+  grep -q '^| 1 | In Progress | 2 | 5 | 3 |$' .vbw-planning/ROADMAP.md
+  ! grep -q '^| 1 | Pending | 0 | 0 | 0 |$' .vbw-planning/ROADMAP.md
+}
+
+@test "create-remediation-phase preserves phase 1 progress when adding phase 2" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+  mkdir -p .vbw-planning/milestones/01-arch/phases/04-ui
+  cat > .vbw-planning/PROJECT.md <<'EOF'
+# Test Project
+EOF
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  cat > .vbw-planning/milestones/01-arch/phases/04-ui/04-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  # Create phase 1
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  # Simulate progress on phase 1
+  sed -i '' 's/| 1 | Pending | 0 | 0 | 0 |/| 1 | Complete | 3 | 8 | 5 |/' .vbw-planning/ROADMAP.md
+  # Simulate state progress
+  sed -i '' 's/Phase 1:\*\* Pending planning/Phase 1:** Complete/' .vbw-planning/STATE.md
+
+  # Create phase 2 — should NOT clobber phase 1 progress
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/04-ui
+  [ "$status" -eq 0 ]
+
+  # Phase 1 progress preserved in ROADMAP.md
+  grep -q '^| 1 | Complete | 3 | 8 | 5 |$' .vbw-planning/ROADMAP.md
+  # Phase 2 added as Pending
+  grep -q '^| 2 | Pending | 0 | 0 | 0 |$' .vbw-planning/ROADMAP.md
+  # Phase 1 status preserved in STATE.md
+  grep -q '^- \*\*Phase 1:\*\* Complete$' .vbw-planning/STATE.md
+  # Phase 2 added as Pending in STATE.md
+  grep -q '^- \*\*Phase 2:\*\* Pending$' .vbw-planning/STATE.md
+}
+
+@test "create-remediation-phase preserves non-canonical ROADMAP progress row formats" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  # Simulate brownfield formatting variance: leading spaces + zero-padded phase id
+  sed -i '' 's/| 1 | Pending | 0 | 0 | 0 |/  | 01 | In Progress | 2 | 5 | 3 |/' .vbw-planning/ROADMAP.md
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  grep -q '^  | 01 | In Progress | 2 | 5 | 3 |$' .vbw-planning/ROADMAP.md
+  ! grep -q '^| 1 | Pending | 0 | 0 | 0 |$' .vbw-planning/ROADMAP.md
+}
+
+@test "create-remediation-phase repairs missing STATE phase bullets for remediation milestone" {
+  mkdir -p .vbw-planning/milestones/01-arch/phases/03-api
+
+  cat > .vbw-planning/milestones/01-arch/phases/03-api/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+  [ "$status" -eq 0 ]
+
+  # Simulate malformed/brownfield STATE.md: remediation milestone, no phase bullets.
+  cat > .vbw-planning/STATE.md <<'EOF'
+# VBW State
+
+**Project:** Test Project
+**Milestone:** UAT Remediation
+
+## Phase Status
+
+## Key Decisions
+| Decision | Date | Rationale |
+|----------|------|-----------|
+| _(No decisions yet)_ | | |
+EOF
+
+  run bash "$SCRIPTS_DIR/create-remediation-phase.sh" \
+    .vbw-planning \
+    .vbw-planning/milestones/01-arch/phases/03-api
+
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"integer expression expected"* ]]
+  grep -q '^- \*\*Phase 1:\*\* Pending$' .vbw-planning/STATE.md
 }
