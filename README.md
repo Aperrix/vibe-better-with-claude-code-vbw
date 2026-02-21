@@ -775,7 +775,7 @@ VBW spawns specialized agents for planning, development, and verification. Model
 | `event_recovery` | boolean | `true` | `true` / `false` |
 
 - **`rolling_summary`** — When `true` and the project is past Phase 1, VBW compiles a condensed digest of all completed prior phases (what was built, files modified, deviations, commit hashes) into `ROLLING-CONTEXT.md`. This digest is injected into agent context via the context compiler, so Phase 3's Dev and Lead agents have awareness of what Phases 1–2 decided, built, and deviated from — without re-reading every prior SUMMARY.md. Adds ~50KB to agent context per phase. Useful for multi-phase projects where cross-phase continuity matters; unnecessary for single-phase work.
-- **`event_recovery`** — When `true`, enables event-sourced state recovery as a fallback during crash recovery. If `.execution-state.json` is stale or missing after a crash, VBW can reconstruct phase/plan status from the event log (`event-log.jsonl`) and SUMMARY.md files.
+- **`event_recovery`** — When `true`, enables automatic event-sourced state recovery on session start. If `.execution-state.json` is stale (older than `event-log.jsonl`) or missing after a crash, VBW automatically calls `recover-state.sh` to reconstruct phase/plan status from the event log and SUMMARY.md files.
 
 ### Display
 

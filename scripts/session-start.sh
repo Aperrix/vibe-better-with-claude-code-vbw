@@ -307,6 +307,53 @@ if [ -n "$PROJECT_GIT_DIR" ] && [ ! -f "$PROJECT_GIT_DIR/.git/hooks/pre-push" ] 
   (bash "$SCRIPT_DIR/install-hooks.sh" 2>/dev/null) || true
 fi
 
+# --- Auto-recover stale execution state (event_recovery gate) ---
+# If event-log.jsonl is newer than .execution-state.json (or state is missing
+# while events exist), call recover-state.sh to rebuild the state file.
+# Gates on event_recovery config flag (recover-state.sh checks internally too).
+if [ -d "$PLANNING_DIR" ] && [ -f "$PLANNING_DIR/config.json" ]; then
+  _er_flag=$(jq -r 'if .event_recovery != null then .event_recovery elif .v3_event_recovery != null then .v3_event_recovery else false end' "$PLANNING_DIR/config.json" 2>/dev/null || echo "false")
+  _events_file="$PLANNING_DIR/.events/event-log.jsonl"
+
+  if [ "$_er_flag" = "true" ] && [ -f "$_events_file" ]; then
+    _exec_state="$PLANNING_DIR/.execution-state.json"
+    _needs_recovery=false
+
+    if [ ! -f "$_exec_state" ]; then
+      # State missing but events exist — recover
+      _needs_recovery=true
+    else
+      # Compare mtimes: recover if event log is strictly newer
+      if [ "$(uname)" = "Darwin" ]; then
+        _mt_state=$(stat -f %m "$_exec_state" 2>/dev/null || echo 0)
+        _mt_events=$(stat -f %m "$_events_file" 2>/dev/null || echo 0)
+      else
+        _mt_state=$(stat -c %Y "$_exec_state" 2>/dev/null || echo 0)
+        _mt_events=$(stat -c %Y "$_events_file" 2>/dev/null || echo 0)
+      fi
+      if [ "$_mt_events" -gt "$_mt_state" ] 2>/dev/null; then
+        _needs_recovery=true
+      fi
+    fi
+
+    if [ "$_needs_recovery" = true ]; then
+      # Determine current phase from STATE.md
+      _phase_num=""
+      if [ -f "$PLANNING_DIR/STATE.md" ]; then
+        _phase_line=$(grep -m1 "^Phase:" "$PLANNING_DIR/STATE.md" 2>/dev/null || true)
+        _phase_num=$(echo "$_phase_line" | sed 's/Phase: *\([0-9]*\).*/\1/')
+      fi
+      if [ -n "$_phase_num" ] && [ "$_phase_num" -gt 0 ] 2>/dev/null; then
+        _recovered=$(bash "$SCRIPT_DIR/recover-state.sh" "$_phase_num" "$PLANNING_DIR/phases" 2>/dev/null)
+        # Only write if we got a non-empty, non-{} result
+        if [ -n "$_recovered" ] && [ "$_recovered" != "{}" ]; then
+          echo "$_recovered" > "$PLANNING_DIR/.execution-state.json"
+        fi
+      fi
+    fi
+  fi
+fi
+
 # --- Reconcile orphaned execution state ---
 EXEC_STATE="$PLANNING_DIR/.execution-state.json"
 if [ -f "$EXEC_STATE" ]; then
