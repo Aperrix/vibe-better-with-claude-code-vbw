@@ -65,8 +65,8 @@ for plan_file in "$PHASE_DIR"/*-PLAN.md; do
     PLAN_NUM=$(echo "$PLAN_ID" | sed 's/^[0-9]*-//' | sed 's/^0*//')
     [ -z "$PLAN_NUM" ] && PLAN_NUM="0"
     EVENT_STATUS=$(grep "\"plan_end\"" "$EVENTS_FILE" 2>/dev/null | \
-      grep "\"phase\":${PHASE}" 2>/dev/null | \
-      grep "\"plan\":${PLAN_NUM}" 2>/dev/null | \
+      grep -E "\"phase\"[[:space:]]*:[[:space:]]*${PHASE}([[:space:]]*[,}])" 2>/dev/null | \
+      grep -E "\"plan\"[[:space:]]*:[[:space:]]*${PLAN_NUM}([[:space:]]*[,}])" 2>/dev/null | \
       tail -1 | jq -r '.data.status // "unknown"' 2>/dev/null) || EVENT_STATUS=""
     [ "$EVENT_STATUS" = "complete" ] && PLAN_STATUS="complete"
     [ "$EVENT_STATUS" = "failed" ] && PLAN_STATUS="failed"

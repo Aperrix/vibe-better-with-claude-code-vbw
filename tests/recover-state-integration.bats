@@ -342,6 +342,35 @@ EXEC
   [ "$plan_status" = "complete" ]
 }
 
+@test "recover-state: exact numeric match prevents plan/phase 1 vs 10 collisions" {
+  cd "$TEST_TEMP_DIR"
+  local tmp
+  tmp=$(mktemp)
+  jq '.event_recovery = true' .vbw-planning/config.json > "$tmp" && mv "$tmp" .vbw-planning/config.json
+
+  # Keep 01-01 pending, add 01-10 pending
+  echo "title: First Task" > .vbw-planning/phases/01-setup/01-01-PLAN.md
+  echo "title: Tenth Task" > .vbw-planning/phases/01-setup/01-10-PLAN.md
+
+  # Adversarial events:
+  # - phase 10 / plan 1 should NOT affect phase 1 recovery
+  # - phase 1 / plan 10 should ONLY affect plan 01-10
+  mkdir -p .vbw-planning/.events
+  cat > .vbw-planning/.events/event-log.jsonl <<'EVENTS'
+{"event":"plan_end","phase":10,"plan":1,"data":{"status":"complete"}}
+{"event":"plan_end","phase":1,"plan":10,"data":{"status":"complete"}}
+EVENTS
+
+  run bash "$SCRIPTS_DIR/recover-state.sh" 1 ".vbw-planning/phases"
+  [ "$status" -eq 0 ]
+
+  plan_01_status=$(echo "$output" | jq -r '.plans[] | select(.id == "01-01") | .status')
+  [ "$plan_01_status" = "pending" ]
+
+  plan_10_status=$(echo "$output" | jq -r '.plans[] | select(.id == "01-10") | .status')
+  [ "$plan_10_status" = "complete" ]
+}
+
 @test "recover-state: non-numeric wave defaults to 1 instead of dropping plan" {
   cd "$TEST_TEMP_DIR"
   local tmp
