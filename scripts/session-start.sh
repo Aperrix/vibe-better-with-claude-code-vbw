@@ -13,6 +13,119 @@ PLANNING_DIR=".vbw-planning"
 . "$(dirname "$0")/resolve-claude-dir.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+find_phase_dir_by_num() {
+  _planning_dir="$1"
+  _phase_num="$2"
+  ls -d "$_planning_dir/phases/$(printf '%02d' "$_phase_num")"-*/ 2>/dev/null | head -1
+}
+
+phase_dir_has_plans() {
+  _phase_dir="$1"
+  [ -n "$_phase_dir" ] && [ -d "$_phase_dir" ] && ls "$_phase_dir"*-PLAN.md >/dev/null 2>&1
+}
+
+# Choose a recovery phase deterministically when STATE.md/execution-state phase is unusable.
+# Priority:
+#   1) latest valid plan_end event phase that still has PLAN artifacts
+#   2) earliest incomplete phase (plans > summaries)
+#   3) latest completed phase (plans > 0 and plans == summaries)
+#   4) earliest phase with plans
+pick_recovery_phase() {
+  _planning_dir="$1"
+  _events_file="$2"
+
+  _candidate=""
+  if [ -f "$_events_file" ]; then
+    while IFS= read -r _event_phase; do
+      [ -n "$_event_phase" ] || continue
+      if ! [ "$_event_phase" -gt 0 ] 2>/dev/null; then
+        continue
+      fi
+      _event_phase_dir=$(find_phase_dir_by_num "$_planning_dir" "$_event_phase")
+      if phase_dir_has_plans "$_event_phase_dir"; then
+        _candidate="$_event_phase"
+      fi
+    done <<EOF
+$(jq -Rr 'fromjson? | select(.event == "plan_end") | ((.phase | tostring | tonumber?) // empty)' "$_events_file" 2>/dev/null)
+EOF
+  fi
+
+  if [ -n "$_candidate" ] && [ "$_candidate" -gt 0 ] 2>/dev/null; then
+    echo "$_candidate"
+    return 0
+  fi
+
+  _first_incomplete=""
+  _last_complete=""
+  _first_with_plan=""
+
+  for _pd in "$_planning_dir"/phases/*/; do
+    [ -d "$_pd" ] || continue
+    _pd_base=$(basename "$_pd")
+    _pd_num=$(echo "$_pd_base" | sed 's/^\([0-9]*\).*/\1/' | sed 's/^0*//')
+    [ -n "$_pd_num" ] || continue
+    if ! [ "$_pd_num" -gt 0 ] 2>/dev/null; then
+      continue
+    fi
+    if ! phase_dir_has_plans "$_pd"; then
+      continue
+    fi
+
+    if [ -z "$_first_with_plan" ] || [ "$_pd_num" -lt "$_first_with_plan" ] 2>/dev/null; then
+      _first_with_plan="$_pd_num"
+    fi
+
+    _plan_count=0
+    for _plan_file in "$_pd"*-PLAN.md; do
+      [ -f "$_plan_file" ] || continue
+      _plan_count=$((_plan_count + 1))
+    done
+
+    _summary_count=0
+    for _summary_file in "$_pd"*-SUMMARY.md; do
+      [ -f "$_summary_file" ] || continue
+      _summary_count=$((_summary_count + 1))
+    done
+
+    if [ "${_summary_count:-0}" -lt "${_plan_count:-0}" ] 2>/dev/null; then
+      if [ -z "$_first_incomplete" ] || [ "$_pd_num" -lt "$_first_incomplete" ] 2>/dev/null; then
+        _first_incomplete="$_pd_num"
+      fi
+    elif [ "${_plan_count:-0}" -gt 0 ] 2>/dev/null; then
+      if [ -z "$_last_complete" ] || [ "$_pd_num" -gt "$_last_complete" ] 2>/dev/null; then
+        _last_complete="$_pd_num"
+      fi
+    fi
+  done
+
+  if [ -n "$_first_incomplete" ] && [ "$_first_incomplete" -gt 0 ] 2>/dev/null; then
+    echo "$_first_incomplete"
+    return 0
+  fi
+  if [ -n "$_last_complete" ] && [ "$_last_complete" -gt 0 ] 2>/dev/null; then
+    echo "$_last_complete"
+    return 0
+  fi
+  if [ -n "$_first_with_plan" ] && [ "$_first_with_plan" -gt 0 ] 2>/dev/null; then
+    echo "$_first_with_plan"
+    return 0
+  fi
+
+  echo ""
+  return 0
+}
+
+atomic_write_string() {
+  _target="$1"
+  _content="$2"
+  _tmp="${_target}.tmp.$$"
+  if printf '%s\n' "$_content" > "$_tmp" 2>/dev/null && mv "$_tmp" "$_target" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$_tmp" 2>/dev/null || true
+  return 1
+}
+
 # If this is a compact-triggered SessionStart, skip — post-compact.sh handles it.
 # The compaction marker is set by compaction-instructions.sh (PreCompact) and cleared
 # by post-compact.sh. Only skip if the marker is fresh (< 60s) to avoid stale markers
@@ -307,9 +420,87 @@ if [ -n "$PROJECT_GIT_DIR" ] && [ ! -f "$PROJECT_GIT_DIR/.git/hooks/pre-push" ] 
   (bash "$SCRIPT_DIR/install-hooks.sh" 2>/dev/null) || true
 fi
 
+# --- Auto-recover stale execution state (event_recovery gate) ---
+# If event-log.jsonl is newer than .execution-state.json (or state is missing
+# while events exist), call recover-state.sh to rebuild the state file.
+# Gates on event_recovery config flag (recover-state.sh checks internally too).
+_auto_recovered=false
+if [ -d "$PLANNING_DIR" ] && [ -f "$PLANNING_DIR/config.json" ]; then
+  _er_flag=$(jq -r 'if .event_recovery != null then .event_recovery elif .v3_event_recovery != null then .v3_event_recovery else false end' "$PLANNING_DIR/config.json" 2>/dev/null || echo "false")
+  _events_file="$PLANNING_DIR/.events/event-log.jsonl"
+
+  # Fix QA#3: require non-empty event log — -s plus grep for actual content
+  # (a file with only whitespace/newlines passes -s but has no events)
+  if [ "$_er_flag" = "true" ] && [ -s "$_events_file" ] && grep -q '[^[:space:]]' "$_events_file" 2>/dev/null; then
+    _exec_state="$PLANNING_DIR/.execution-state.json"
+    _needs_recovery=false
+
+    if [ ! -f "$_exec_state" ]; then
+      # State missing but events exist — recover
+      _needs_recovery=true
+    else
+      # Compare mtimes: recover if event log is strictly newer
+      if [ "$(uname)" = "Darwin" ]; then
+        _mt_state=$(stat -f %m "$_exec_state" 2>/dev/null || echo 0)
+        _mt_events=$(stat -f %m "$_events_file" 2>/dev/null || echo 0)
+      else
+        _mt_state=$(stat -c %Y "$_exec_state" 2>/dev/null || echo 0)
+        _mt_events=$(stat -c %Y "$_events_file" 2>/dev/null || echo 0)
+      fi
+      if [ "$_mt_events" -gt "$_mt_state" ] 2>/dev/null; then
+        _needs_recovery=true
+      fi
+    fi
+
+    if [ "$_needs_recovery" = true ]; then
+      # Determine current phase from STATE.md
+      _phase_num=""
+      if [ -f "$PLANNING_DIR/STATE.md" ]; then
+        _phase_line=$(grep -m1 "^Phase:" "$PLANNING_DIR/STATE.md" 2>/dev/null || true)
+        _phase_num=$(echo "$_phase_line" | sed 's/Phase: *\([0-9]*\).*/\1/')
+      fi
+
+      # Fix QA#1: fallback to .execution-state.json phase, then artifact/event-based detection
+      if ! [ -n "$_phase_num" ] 2>/dev/null || ! [ "$_phase_num" -gt 0 ] 2>/dev/null; then
+        _phase_num=""
+        # Try existing execution state
+        if [ -f "$_exec_state" ]; then
+          _exec_phase=$(jq -r '.phase // ""' "$_exec_state" 2>/dev/null || true)
+          if [ -n "$_exec_phase" ] && [ "$_exec_phase" -gt 0 ] 2>/dev/null; then
+            _exec_phase_dir=$(find_phase_dir_by_num "$PLANNING_DIR" "$_exec_phase")
+            if phase_dir_has_plans "$_exec_phase_dir"; then
+              _phase_num="$_exec_phase"
+            fi
+          fi
+        fi
+        # Still empty? Choose from events/artifacts rather than max numeric phase.
+        if ! [ -n "$_phase_num" ] 2>/dev/null || ! [ "$_phase_num" -gt 0 ] 2>/dev/null; then
+          _phase_num=$(pick_recovery_phase "$PLANNING_DIR" "$_events_file")
+        fi
+      fi
+
+      if [ -n "$_phase_num" ] && [ "$_phase_num" -gt 0 ] 2>/dev/null; then
+        _recovered=$(bash "$SCRIPT_DIR/recover-state.sh" "$_phase_num" "$PLANNING_DIR/phases" 2>/dev/null)
+        # Only write if we got a non-empty, non-{} result
+        if [ -n "$_recovered" ] && [ "$_recovered" != "{}" ]; then
+          # Fix QA#2: validate recovered phase matches requested phase and has plans
+          _recovered_phase=$(echo "$_recovered" | jq -r '.phase // 0' 2>/dev/null || echo 0)
+          _recovered_plan_count=$(echo "$_recovered" | jq -r '.plans | length // 0' 2>/dev/null || echo 0)
+          if [ "$_recovered_phase" = "$_phase_num" ] && [ "${_recovered_plan_count:-0}" -gt 0 ] 2>/dev/null; then
+            if atomic_write_string "$PLANNING_DIR/.execution-state.json" "$_recovered"; then
+              _auto_recovered=true
+            fi
+          fi
+        fi
+      fi
+    fi
+  fi
+fi
+
 # --- Reconcile orphaned execution state ---
+# Fix QA#4: skip reconcile if auto-recovery already wrote state this session
 EXEC_STATE="$PLANNING_DIR/.execution-state.json"
-if [ -f "$EXEC_STATE" ]; then
+if [ "$_auto_recovered" = false ] && [ -f "$EXEC_STATE" ]; then
   EXEC_STATUS=$(jq -r '.status // ""' "$EXEC_STATE" 2>/dev/null)
   if [ "$EXEC_STATUS" = "running" ]; then
     PHASE_NUM=$(jq -r '.phase // ""' "$EXEC_STATE" 2>/dev/null)
@@ -324,7 +515,12 @@ if [ -f "$EXEC_STATE" ]; then
       SUMMARY_COUNT=$(ls -1 "$PHASE_DIR" 2>/dev/null | grep '\-SUMMARY\.md$' | wc -l | tr -d ' ')
       if [ "${SUMMARY_COUNT:-0}" -ge "${PLAN_COUNT:-1}" ] && [ "${PLAN_COUNT:-0}" -gt 0 ]; then
         # All plans have SUMMARY.md — build finished after crash
-        jq '.status = "complete"' "$EXEC_STATE" > "$PLANNING_DIR/.execution-state.json.tmp" && mv "$PLANNING_DIR/.execution-state.json.tmp" "$EXEC_STATE"
+        _exec_tmp="${EXEC_STATE}.tmp.$$"
+        if jq '.status = "complete"' "$EXEC_STATE" > "$_exec_tmp" 2>/dev/null && mv "$_exec_tmp" "$EXEC_STATE" 2>/dev/null; then
+          :
+        else
+          rm -f "$_exec_tmp" 2>/dev/null || true
+        fi
         BUILD_STATE="complete (recovered)"
       else
         BUILD_STATE="interrupted (${SUMMARY_COUNT:-0}/${PLAN_COUNT:-0} plans)"
