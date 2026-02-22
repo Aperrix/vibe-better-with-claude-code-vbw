@@ -8,11 +8,12 @@ set -euo pipefail
 # Model-executed bash commands that reference ${CLAUDE_PLUGIN_ROOT} expand to empty.
 #
 # Fix: Each command file resolves the plugin root ONCE at load time (via !` backtick with
-# a fallback ls chain) and writes it to /tmp/.vbw-plugin-root. All subsequent references
-# use `!`cat /tmp/.vbw-plugin-root` (load-time) or $(cat /tmp/.vbw-plugin-root) (runtime).
+# a fallback ls chain), creates a canonical no-space symlink path, and writes that symlink
+# to /tmp/.vbw-plugin-root. Subsequent load-time references read from this file.
 #
 # Safe contexts (all refs must be in one of these):
 #   - cat /tmp/.vbw-plugin-root           (temp file read — standard pattern)
+#   - LINK="/tmp/.vbw-plugin-root-link-*" (canonical no-space symlink)
 #   - !`...${CLAUDE_PLUGIN_ROOT:-...}...` (resolve line with fallback)
 #   - @${CLAUDE_PLUGIN_ROOT}/...         (file inclusion at load time)
 #   - Plugin root: ...                   (preamble resolve+write line)
@@ -152,18 +153,25 @@ fi
 
 echo "All preamble fallback checks passed."
 
-# --- Phase 3: Runtime resolver safety for execute protocol ---
+# --- Phase 3: Runtime resolver safety ---
 echo ""
 echo "=== Runtime Resolver Safety Verification ==="
 
 EXECUTE_PROTOCOL="$REFERENCES_DIR/execute-protocol.md"
 PHASE_DETECTION="$REFERENCES_DIR/phase-detection.md"
 
-if grep -q '\$(cat /tmp/.vbw-plugin-root)' "$EXECUTE_PROTOCOL" "$PHASE_DETECTION"; then
+if grep -R -n '\$(cat /tmp/.vbw-plugin-root)' "$COMMANDS_DIR" "$REFERENCES_DIR" >/tmp/.vbw-plugin-runtime-grep 2>/dev/null; then
   fail "runtime docs contain direct \$(cat /tmp/.vbw-plugin-root) execution path"
-  grep -n '\$(cat /tmp/.vbw-plugin-root)' "$EXECUTE_PROTOCOL" "$PHASE_DETECTION" | while IFS= read -r line; do echo "      $line"; done
+  while IFS= read -r line; do echo "      $line"; done </tmp/.vbw-plugin-runtime-grep
 else
   pass "runtime docs avoid direct \$(cat /tmp/.vbw-plugin-root) execution path"
+fi
+
+canonical_count=$(grep -R -c 'LINK="/tmp/.vbw-plugin-root-link-' "$COMMANDS_DIR" "$REFERENCES_DIR" 2>/dev/null | awk -F: '{s+=$NF} END{print s+0}')
+if [ "$canonical_count" -ge 1 ]; then
+  pass "resolver preambles emit canonical no-space link path"
+else
+  fail "resolver preambles missing canonical no-space link path"
 fi
 
 for needle in \

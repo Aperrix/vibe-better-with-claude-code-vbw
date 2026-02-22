@@ -15,7 +15,7 @@ Working directory:
 ```
 Plugin root:
 ```
-!`VBW_CACHE_ROOT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/vbw-marketplace/vbw"; R=""; if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "${CLAUDE_PLUGIN_ROOT}" ]; then R="${CLAUDE_PLUGIN_ROOT}"; elif [ -d "${VBW_CACHE_ROOT}/local" ]; then R="${VBW_CACHE_ROOT}/local"; else V=$(ls -1d "${VBW_CACHE_ROOT}"/* 2>/dev/null | awk -F/ '{print $NF}' | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1); [ -n "$V" ] && R="${VBW_CACHE_ROOT}/${V}"; if [ -z "$R" ]; then L=$(ls -1d "${VBW_CACHE_ROOT}"/* 2>/dev/null | awk -F/ '{print $NF}' | sort | tail -1); [ -n "$L" ] && R="${VBW_CACHE_ROOT}/${L}"; fi; fi; if [ -z "$R" ] || [ ! -d "$R" ]; then echo "VBW: plugin root resolution failed" >&2; exit 1; fi; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
+!`VBW_CACHE_ROOT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/vbw-marketplace/vbw"; R=""; if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -d "${CLAUDE_PLUGIN_ROOT}" ]; then R="${CLAUDE_PLUGIN_ROOT}"; elif [ -d "${VBW_CACHE_ROOT}/local" ]; then R="${VBW_CACHE_ROOT}/local"; else V=$(ls -1d "${VBW_CACHE_ROOT}"/* 2>/dev/null | awk -F/ '{print $NF}' | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1); [ -n "$V" ] && R="${VBW_CACHE_ROOT}/${V}"; if [ -z "$R" ]; then L=$(ls -1d "${VBW_CACHE_ROOT}"/* 2>/dev/null | awk -F/ '{print $NF}' | sort | tail -1); [ -n "$L" ] && R="${VBW_CACHE_ROOT}/${L}"; fi; fi; if [ -z "$R" ] || [ ! -d "$R" ]; then echo "VBW: plugin root resolution failed" >&2; exit 1; fi; SESSION_KEY="${CLAUDE_SESSION_ID:-default}"; LINK="/tmp/.vbw-plugin-root-link-${SESSION_KEY}"; rm -f "$LINK"; ln -s "$R" "$LINK" 2>/dev/null || { echo "VBW: plugin root link failed" >&2; exit 1; }; printf '%s' "$LINK" > /tmp/.vbw-plugin-root; echo "$LINK"`
 ```
 
 Current state:
@@ -32,10 +32,12 @@ Phase directories:
 
 Phase state:
 ```text
-!`bash "$(cat /tmp/.vbw-plugin-root)/scripts/phase-detect.sh" 2>/dev/null || echo "phase_detect_error=true"`
+!`bash `!`cat /tmp/.vbw-plugin-root`/scripts/phase-detect.sh 2>/dev/null || echo "phase_detect_error=true"`
 ```
 
-!`bash "$(cat /tmp/.vbw-plugin-root)/scripts/suggest-compact.sh" qa 2>/dev/null || true`
+```text
+!`bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-compact.sh qa 2>/dev/null || true`
+```
 
 ## Guard
 - Not initialized (no .vbw-planning/ dir): STOP "Run /vbw:init first."
@@ -93,7 +95,7 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
   write `{phase-dir}/{phase}-VERIFICATION.md` with frontmatter (phase, tier,
   result, passed, failed, total, date) and QA body as content.
 
-5. **Present:** Per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md:
+1. **Present:** Per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md:
     ```text
     ┌──────────────────────────────────────────┐
     │  Phase {N}: {name} -- Verified           │
@@ -117,4 +119,8 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
 ```
 This is **display-only**. Do NOT edit STATE.md, do NOT add todos, do NOT invoke /vbw:todo, and do NOT enter an interactive loop. The user decides whether to track these. If no discovered issues: omit the section entirely. After displaying discovered issues, STOP. Do not take further action.
 
-Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-next.sh qa {result}` and display.
+Run:
+```text
+bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-next.sh qa {result}
+```
+Then display the output.

@@ -68,3 +68,15 @@ load test_helper
   run bash -c "grep -R -n 'sort -V 2>/dev/null \\\|\\\| sort -t\\.' \"$PROJECT_ROOT/commands\" \"$PROJECT_ROOT/references\" 2>/dev/null"
   [ "$status" -eq 1 ]
 }
+
+@test "plugin-root callsites avoid runtime command substitution" {
+  run bash -c "grep -R -n '\\\$\\(cat /tmp/.vbw-plugin-root\\)' \"$PROJECT_ROOT/commands\" \"$PROJECT_ROOT/references\" 2>/dev/null"
+  [ "$status" -eq 1 ]
+}
+
+@test "plugin-root resolver emits canonical link path" {
+  local count
+  count=$(grep -R -c 'LINK="/tmp/.vbw-plugin-root-link-' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
+  [[ "$count" =~ ^[0-9]+$ ]]
+  [ "$count" -ge 1 ]
+}
