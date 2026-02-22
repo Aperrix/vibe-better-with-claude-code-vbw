@@ -123,22 +123,24 @@ date: {YYYY-MM-DD}
 
 ### Structure
 
+All check tables use a uniform 5-column format: `# | ID | {Category Column} | Status | Evidence`.
+
 ```markdown
 # Verification: Phase {N}
 ## Must-Have Checks
-| # | Truth/Condition | Status | Evidence |
+| # | ID | Truth/Condition | Status | Evidence |
 ## Artifact Checks
-| Artifact | Exists | Contains | Status |
+| # | ID | Artifact | Status | Evidence |
 ## Key Link Checks
-| From | To | Via | Status |
+| # | ID | Link | Status | Evidence |
 ## Anti-Pattern Scan (standard+)
-| Pattern | Found | Location | Severity |
+| # | ID | Pattern | Status | Evidence |
 ## Requirement Mapping (deep only)
-| Requirement | Plan Ref | Artifact Evidence | Status |
+| # | ID | Requirement | Status | Evidence |
 ## Convention Compliance (standard+, if CONVENTIONS.md)
-| Convention | File | Status | Detail |
+| # | ID | Convention | Status | Evidence |
 ## Skill-Augmented Checks (if quality skills)
-| Skill | Check | Status | Evidence |
+| # | ID | Skill Check | Status | Evidence |
 ## Summary
 Tier: / Result: / Passed: N/total / Failed: [list]
 ```

@@ -28,18 +28,18 @@ Before deriving checks: if `.vbw-planning/codebase/META.md` exists, read whichev
 When running verification checks, if a test or check failure is clearly unrelated to the phase's work — the failing test covers a module not in the plan's `files_modified`, the test predates the phase's commits, or the failure exists on the base branch — classify it as **pre-existing** rather than counting it against the phase result. Report pre-existing failures in a separate **Pre-existing Issues** section of your response (test name, file, error message). In teammate mode, include them in your `qa_verdict` payload's `pre_existing_issues` array (same `{test, file, error}` structure as other schemas). They must NOT influence the PASS/FAIL/PARTIAL verdict for the phase. If you cannot determine whether a failure is pre-existing or caused by the phase's changes, treat it as a phase failure and count it against the verdict (conservative default — do not ignore uncertain failures).
 
 ## Output
-`Must-Have Checks | # | Truth | Status | Evidence` / `Artifact Checks | Artifact | Exists | Contains | Status` / `Key Link Checks | From | To | Via | Status` / `Summary: Tier | Result | Passed: N/total | Failed: list`
+`# | ID | {Category Column} | Status | Evidence` — all check tables use this 5-column format. Category column name varies: `Truth/Condition`, `Artifact`, `Link`, `Pattern`, `Convention`, `Requirement`. Summary: `Tier | Result | Passed: N/total | Failed: list`
 
 ### VERIFICATION.md Format
 Frontmatter: `phase`, `tier` (quick|standard|deep), `result` (PASS|FAIL|PARTIAL), `passed`, `failed`, `total`, `date`.
 
-Body sections (include all that apply):
-- `## Must-Have Checks` — table: # | Truth/Condition | Status | Evidence
-- `## Artifact Checks` — table: Artifact | Exists | Contains | Status
-- `## Key Link Checks` — table: From | To | Via | Status
-- `## Anti-Pattern Scan` (standard+) — table: Pattern | Found | Location | Severity
-- `## Requirement Mapping` (deep only) — table: Requirement | Plan Ref | Artifact Evidence | Status
-- `## Convention Compliance` (standard+, if CONVENTIONS.md) — table: Convention | File | Status | Detail
+Body sections (include all that apply) — all tables use 5 columns (`# | ID | {col} | Status | Evidence`):
+- `## Must-Have Checks` — table: # | ID | Truth/Condition | Status | Evidence
+- `## Artifact Checks` — table: # | ID | Artifact | Status | Evidence
+- `## Key Link Checks` — table: # | ID | Link | Status | Evidence
+- `## Anti-Pattern Scan` (standard+) — table: # | ID | Pattern | Status | Evidence
+- `## Requirement Mapping` (deep only) — table: # | ID | Requirement | Status | Evidence
+- `## Convention Compliance` (standard+, if CONVENTIONS.md) — table: # | ID | Convention | Status | Evidence
 - `## Pre-existing Issues` (if any found) — table: Test | File | Error
 - `## Summary` — Tier: / Result: / Passed: N/total / Failed: [list]
 

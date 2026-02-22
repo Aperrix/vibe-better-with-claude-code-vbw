@@ -134,7 +134,7 @@ if [[ "$has_checks_detail" == "true" ]]; then
 
   # Helper: escape pipe characters and newlines for markdown table cells
   escape_pipes() {
-    printf '%s' "$1" | tr '\n' ' ' | sed 's/|/\&#124;/g'
+    printf '%s' "$1" | tr '\r\n' '  ' | sed 's/|/\&#124;/g'
   }
 
   # Helper: emit a table for a given category
