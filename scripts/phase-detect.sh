@@ -213,8 +213,8 @@ if [ -d "$PHASES_DIR" ]; then
 
       # Skip phases without execution artifacts — a UAT file in a never-executed phase is orphaned/stale.
       # Also skip mid-execution phases (SUMMARY < PLAN) — UAT from a prior run is stale until re-execution completes.
-      DIR_PLANS=$(ls "$DIR"[0-9]*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
-      DIR_SUMMARIES=$(ls "$DIR"[0-9]*-SUMMARY.md 2>/dev/null | wc -l | tr -d ' ')
+      DIR_PLANS=$(find "$DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-PLAN.md' 2>/dev/null | wc -l | tr -d ' ')
+      DIR_SUMMARIES=$(find "$DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-SUMMARY.md' 2>/dev/null | wc -l | tr -d ' ')
       if [ "$DIR_PLANS" -eq 0 ] || [ "$DIR_SUMMARIES" -lt "$DIR_PLANS" ]; then
         continue
       fi
@@ -245,8 +245,8 @@ if [ -d "$PHASES_DIR" ]; then
       NEXT_PHASE="$UAT_ISSUES_PHASE"
       NEXT_PHASE_SLUG="$UAT_ISSUES_SLUG"
       NEXT_PHASE_STATE="needs_uat_remediation"
-      NEXT_PHASE_PLANS=$(ls "$TARGET_DIR"[0-9]*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
-      NEXT_PHASE_SUMMARIES=$(ls "$TARGET_DIR"[0-9]*-SUMMARY.md 2>/dev/null | wc -l | tr -d ' ')
+      NEXT_PHASE_PLANS=$(find "$TARGET_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-PLAN.md' 2>/dev/null | wc -l | tr -d ' ')
+      NEXT_PHASE_SUMMARIES=$(find "$TARGET_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-SUMMARY.md' 2>/dev/null | wc -l | tr -d ' ')
     else
       ALL_DONE=true
       if [ ${#PHASE_DIRS[@]} -gt 0 ]; then
@@ -261,14 +261,14 @@ if [ -d "$PHASES_DIR" ]; then
         fi
 
         # Count PLAN and SUMMARY files
-        P_COUNT=$(ls "$DIR"[0-9]*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
-        S_COUNT=$(ls "$DIR"[0-9]*-SUMMARY.md 2>/dev/null | wc -l | tr -d ' ')
+        P_COUNT=$(find "$DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-PLAN.md' 2>/dev/null | wc -l | tr -d ' ')
+        S_COUNT=$(find "$DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-SUMMARY.md' 2>/dev/null | wc -l | tr -d ' ')
 
         if [ "$P_COUNT" -eq 0 ]; then
           # Check if discussion is required before planning
           if [ "$CFG_REQUIRE_PHASE_DISCUSSION" = true ]; then
             # Check for CONTEXT.md (canonical phase-prefixed pattern only)
-            C_COUNT=$(ls "$DIR"[0-9]*-CONTEXT.md 2>/dev/null | wc -l | tr -d ' ')
+            C_COUNT=$(find "$DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-CONTEXT.md' 2>/dev/null | wc -l | tr -d ' ')
             if [ "$C_COUNT" -eq 0 ]; then
               if [ "$NEXT_PHASE" = "none" ]; then
                 NEXT_PHASE="$NUM"
@@ -373,8 +373,8 @@ if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] ||
       [ -f "${_ms_phase_dir}.remediated" ] && continue
 
       # Skip phases without execution artifacts
-      _ms_plans=$(ls "$_ms_phase_dir"[0-9]*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
-      _ms_summaries=$(ls "$_ms_phase_dir"[0-9]*-SUMMARY.md 2>/dev/null | wc -l | tr -d ' ')
+      _ms_plans=$(find "$_ms_phase_dir" -maxdepth 1 ! -name '.*' -name '[0-9]*-PLAN.md' 2>/dev/null | wc -l | tr -d ' ')
+      _ms_summaries=$(find "$_ms_phase_dir" -maxdepth 1 ! -name '.*' -name '[0-9]*-SUMMARY.md' 2>/dev/null | wc -l | tr -d ' ')
       if [ "$_ms_plans" -eq 0 ] || [ "$_ms_summaries" -lt "$_ms_plans" ]; then
         continue
       fi
