@@ -224,7 +224,14 @@ Validate setting + value. Update config.json. Display ✓ with ➜.
 If `setting=planning_tracking`, after writing config run:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/planning-git.sh sync-ignore .vbw-planning/config.json
+  PG_SCRIPT="${CLAUDE_PLUGIN_ROOT:-}/scripts/planning-git.sh"
+  [ -f "$PG_SCRIPT" ] || PG_SCRIPT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/marketplaces/vbw-marketplace/scripts/planning-git.sh"
+  [ -f "$PG_SCRIPT" ] || PG_SCRIPT="$(find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/vbw-marketplace/vbw" -mindepth 2 -maxdepth 2 -type f -path '*/scripts/planning-git.sh' 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1)"
+  if [ -f "$PG_SCRIPT" ]; then
+    bash "$PG_SCRIPT" sync-ignore .vbw-planning/config.json
+  else
+    echo "VBW: planning-git.sh unavailable; skipping .gitignore sync" >&2
+  fi
 ```
 
 This keeps root `.gitignore` and `.vbw-planning/.gitignore` aligned with the selected tracking mode.
