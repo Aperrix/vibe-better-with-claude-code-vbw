@@ -224,7 +224,13 @@ Validate setting + value. Update config.json. Display ✓ with ➜.
 If `setting=planning_tracking`, after writing config run:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/planning-git.sh sync-ignore .vbw-planning/config.json
+  PG_SCRIPT="$(ls -1 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/*/scripts/planning-git.sh 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1)"
+  [ ! -f "$PG_SCRIPT" ] && PG_SCRIPT="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/scripts/planning-git.sh}"
+  if [ -f "$PG_SCRIPT" ]; then
+    bash "$PG_SCRIPT" sync-ignore .vbw-planning/config.json
+  else
+    echo "VBW: planning-git.sh unavailable; skipping .gitignore sync" >&2
+  fi
 ```
 
 This keeps root `.gitignore` and `.vbw-planning/.gitignore` aligned with the selected tracking mode.
@@ -364,6 +370,8 @@ Note: `auto_commit` controls source-task commits during Execute mode. Planning a
 | lease_locks | boolean | true/false | false |
 | event_recovery | boolean | true/false | false |
 | monorepo_routing | boolean | true/false | true |
+| require_phase_discussion | boolean | true/false | false |
+| auto_uat | boolean | true/false | false |
 | rolling_summary | boolean | true/false | false |
 
 ### agent_max_turns
