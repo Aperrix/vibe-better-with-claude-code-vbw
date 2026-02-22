@@ -33,7 +33,6 @@ for vf in "${verif_files[@]}"; do
   total=""
   tier=""
   in_frontmatter=false
-  frontmatter_done=false
   fm_count=0
 
   while IFS= read -r line; do
@@ -44,11 +43,11 @@ for vf in "${verif_files[@]}"; do
         continue
       elif [[ $fm_count -eq 2 ]]; then
         in_frontmatter=false
-        frontmatter_done=true
         break
       fi
     fi
     if [[ "$in_frontmatter" == true ]]; then
+      # shellcheck disable=SC2034  # failed: parsed for frontmatter completeness
       case "$line" in
         result:*) result=$(echo "$line" | sed 's/^result: *//') ;;
         passed:*) passed=$(echo "$line" | sed 's/^passed: *//') ;;
