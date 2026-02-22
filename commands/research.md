@@ -11,7 +11,7 @@ allowed-tools: Read, Write, Bash, Glob, Grep, WebFetch
 ## Context
 
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 Current project:
 ```
@@ -30,9 +30,9 @@ Current project:
    - Resolve Scout model:
      ```bash
     RESEARCH_EFFORT=$(jq -r '.effort // "balanced"' .vbw-planning/config.json 2>/dev/null)
-     SCOUT_MODEL=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+     SCOUT_MODEL=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`cat /tmp/.vbw-plugin-root`/config/model-profiles.json)
      if [ $? -ne 0 ]; then echo "$SCOUT_MODEL" >&2; exit 1; fi
-    SCOUT_MAX_TURNS=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "$RESEARCH_EFFORT")
+    SCOUT_MAX_TURNS=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "$RESEARCH_EFFORT")
     if [ $? -ne 0 ]; then echo "$SCOUT_MAX_TURNS" >&2; exit 1; fi
      ```
    - Display: `◆ Spawning Scout (${SCOUT_MODEL})...`

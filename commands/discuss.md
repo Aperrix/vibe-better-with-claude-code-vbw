@@ -12,7 +12,7 @@ disable-model-invocation: true
 ## Context
 
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 Phase state:
 ```
@@ -34,4 +34,4 @@ Phase state:
 
 ## Execute
 
-Read ``!`echo $CLAUDE_PLUGIN_ROOT`/references/discussion-engine.md` and follow its protocol for the target phase.
+Read ``!`cat /tmp/.vbw-plugin-root`/references/discussion-engine.md` and follow its protocol for the target phase.

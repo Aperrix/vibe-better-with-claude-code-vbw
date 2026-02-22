@@ -11,7 +11,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 ## Context
 
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 Current state:
 ```
@@ -152,4 +152,4 @@ This is **display-only**. Do NOT edit STATE.md, do NOT add todos, do NOT invoke 
   - All issues are `minor`:
     - `Suggest /vbw:fix to address recorded issues.`
 
-Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh verify {result} {phase}` and display.
+Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-next.sh verify {result} {phase}` and display.

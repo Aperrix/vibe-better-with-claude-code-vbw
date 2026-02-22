@@ -10,7 +10,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, WebFetch
 
 ## Context
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 Recent commits:
 ```text
@@ -25,7 +25,7 @@ Recent commits:
 1. **Parse + effort:** Entire $ARGUMENTS = bug description.
   Map effort: thorough=high, balanced/fast=medium, turbo=low.
   Keep effort profile as `EFFORT_PROFILE` (thorough|balanced|fast|turbo).
-  Read ``!`echo $CLAUDE_PLUGIN_ROOT`/references/effort-profile-{profile}.md`.
+  Read ``!`cat /tmp/.vbw-plugin-root`/references/effort-profile-{profile}.md`.
 
 2. **Classify ambiguity:** 2+ signals = ambiguous.
   Keywords: "intermittent/sometimes/random/unclear/inconsistent/flaky/sporadic/nondeterministic",
@@ -49,14 +49,14 @@ Recent commits:
     - Generate 3 hypotheses (cause, codebase area, confirming evidence)
     - Resolve Debugger model:
         ```bash
-        DEBUGGER_MODEL=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+        DEBUGGER_MODEL=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json `!`cat /tmp/.vbw-plugin-root`/config/model-profiles.json)
         if [ $? -ne 0 ]; then echo "$DEBUGGER_MODEL" >&2; exit 1; fi
-        DEBUGGER_MAX_TURNS=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-max-turns.sh debugger .vbw-planning/config.json "$EFFORT_PROFILE")
+        DEBUGGER_MAX_TURNS=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-max-turns.sh debugger .vbw-planning/config.json "$EFFORT_PROFILE")
         if [ $? -ne 0 ]; then echo "$DEBUGGER_MAX_TURNS" >&2; exit 1; fi
         ```
     - Display: `◆ Spawning Debugger (${DEBUGGER_MODEL})...`
     - Create Agent Team "debug-{timestamp}" via TeamCreate
-    - Create 3 tasks via TaskCreate, each with: bug report, ONE hypothesis only (no cross-contamination), working dir, codebase bootstrap instruction ("If `.vbw-planning/codebase/META.md` exists, read ARCHITECTURE.md, CONCERNS.md, PATTERNS.md, and DEPENDENCIES.md (whichever exist) from `.vbw-planning/codebase/` to bootstrap codebase understanding before investigating"), instruction to report via `debugger_report` schema (see ``!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md`), instruction: "If investigation reveals pre-existing failures unrelated to this bug, list them in your response under a 'Pre-existing Issues' heading with test name, file, and failure message." **Include `[analysis-only]` in each task subject** (e.g., "Hypothesis 1: race condition in sync handler [analysis-only]") so the TaskCompleted hook skips the commit-verification gate for report-only tasks.
+    - Create 3 tasks via TaskCreate, each with: bug report, ONE hypothesis only (no cross-contamination), working dir, codebase bootstrap instruction ("If `.vbw-planning/codebase/META.md` exists, read ARCHITECTURE.md, CONCERNS.md, PATTERNS.md, and DEPENDENCIES.md (whichever exist) from `.vbw-planning/codebase/` to bootstrap codebase understanding before investigating"), instruction to report via `debugger_report` schema (see ``!`cat /tmp/.vbw-plugin-root`/references/handoff-schemas.md`), instruction: "If investigation reveals pre-existing failures unrelated to this bug, list them in your response under a 'Pre-existing Issues' heading with test name, file, and failure message." **Include `[analysis-only]` in each task subject** (e.g., "Hypothesis 1: race condition in sync handler [analysis-only]") so the TaskCompleted hook skips the commit-verification gate for report-only tasks.
     - Spawn 3 vbw-debugger teammates, one task each. **Add `model: "${DEBUGGER_MODEL}"` and `maxTurns: ${DEBUGGER_MAX_TURNS}` parameters to each Task spawn.**
     - Wait for completion. Synthesize: strongest evidence + highest confidence wins. Multiple confirmed = contributing factors.
     - Collect pre-existing issues from all debugger responses. De-duplicate by test name and file (keep first error message when the same test+file pair has different messages) — if multiple debuggers report the same pre-existing failure, include it only once.
@@ -66,9 +66,9 @@ Recent commits:
     **Path B: Standard** (all other cases):
     - Resolve Debugger model:
         ```bash
-        DEBUGGER_MODEL=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+        DEBUGGER_MODEL=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json `!`cat /tmp/.vbw-plugin-root`/config/model-profiles.json)
         if [ $? -ne 0 ]; then echo "$DEBUGGER_MODEL" >&2; exit 1; fi
-        DEBUGGER_MAX_TURNS=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-max-turns.sh debugger .vbw-planning/config.json "$EFFORT_PROFILE")
+        DEBUGGER_MAX_TURNS=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-max-turns.sh debugger .vbw-planning/config.json "$EFFORT_PROFILE")
         if [ $? -ne 0 ]; then echo "$DEBUGGER_MAX_TURNS" >&2; exit 1; fi
         ```
     - Display: `◆ Spawning Debugger (${DEBUGGER_MODEL})...`

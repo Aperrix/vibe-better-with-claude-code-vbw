@@ -14,9 +14,9 @@ load test_helper
   [ "$count" -ge 8 ]
 }
 
-@test "planning-git callsites use inline PLUGIN_ROOT fallback" {
+@test "planning-git callsites use temp-file fallback" {
   local count
-  count=$(grep -R -c '`!`echo.*CLAUDE_PLUGIN_ROOT.*planning-git' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
+  count=$(grep -R -c 'cat.*/tmp/.vbw-plugin-root.*planning-git' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
   [[ "$count" =~ ^[0-9]+$ ]]
   [ "$count" -ge 8 ]
 }
@@ -31,13 +31,13 @@ load test_helper
   [ "$status" -eq 1 ]
 }
 
-@test "planning-git resolver checks cache before PLUGIN_ROOT in all blocks" {
+@test "planning-git resolver checks cache before temp-file fallback in all blocks" {
   # Checks ALL resolver pairs per file, not just the first (F2 fix)
   local files=("$PROJECT_ROOT/commands/config.md" "$PROJECT_ROOT/commands/init.md" "$PROJECT_ROOT/commands/vibe.md" "$PROJECT_ROOT/references/execute-protocol.md")
   for f in "${files[@]}"; do
     local cache_lines plugin_lines cache_count plugin_count
     cache_lines=$(grep -n 'ls -1.*plugins/cache/vbw-marketplace.*planning-git' "$f" | cut -d: -f1)
-    plugin_lines=$(grep -n '`!`echo.*CLAUDE_PLUGIN_ROOT.*planning-git' "$f" | cut -d: -f1)
+    plugin_lines=$(grep -n 'cat.*/tmp/.vbw-plugin-root.*planning-git' "$f" | cut -d: -f1)
     cache_count=$(echo "$cache_lines" | wc -l | tr -d ' ')
     plugin_count=$(echo "$plugin_lines" | wc -l | tr -d ' ')
     [ "$cache_count" = "$plugin_count" ] || { echo "Unequal pair count in $f: cache=$cache_count plugin=$plugin_count"; false; }
@@ -60,10 +60,10 @@ load test_helper
 }
 
 @test "planning-git cache and fallback counts match" {
-  # Ensures no additive bad-form callsites — cache ls count must equal fallback count (F4)
+  # Ensures no additive bad-form callsites — cache ls count must equal temp-file fallback count (F4)
   local cache_count fallback_count
   cache_count=$(grep -R -c 'ls -1.*plugins/cache/vbw-marketplace/vbw.*planning-git.sh' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
-  fallback_count=$(grep -R -c '`!`echo.*CLAUDE_PLUGIN_ROOT.*planning-git' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
+  fallback_count=$(grep -R -c 'cat.*/tmp/.vbw-plugin-root.*planning-git' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
   [ "$cache_count" = "$fallback_count" ] || { echo "Mismatched: cache=$cache_count fallback=$fallback_count"; false; }
 }
 

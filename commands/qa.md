@@ -10,7 +10,7 @@ allowed-tools: Read, Write, Bash, Glob, Grep
 
 ## Context
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 Current state:
 ```text
@@ -44,7 +44,7 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
   Keep effort profile as `QA_EFFORT_PROFILE` (thorough|balanced|fast|turbo).
   Effort mapping: turbo=skip (exit "QA skipped in turbo mode"), fast=quick,
   balanced=standard, thorough=deep.
-  Read ``!`echo $CLAUDE_PLUGIN_ROOT`/references/effort-profile-{profile}.md`.
+  Read ``!`cat /tmp/.vbw-plugin-root`/references/effort-profile-{profile}.md`.
   Context overrides: >15 requirements or last phase before ship → Deep.
 
 2. **Resolve phase:** Use `.vbw-planning/phases/` for phase directories.
@@ -53,9 +53,9 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
     - Resolve QA model:
 
         ```bash
-        QA_MODEL=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh qa .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+        QA_MODEL=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-model.sh qa .vbw-planning/config.json `!`cat /tmp/.vbw-plugin-root`/config/model-profiles.json)
         if [ $? -ne 0 ]; then echo "$QA_MODEL" >&2; exit 1; fi
-        QA_MAX_TURNS=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-max-turns.sh qa .vbw-planning/config.json "$QA_EFFORT_PROFILE")
+        QA_MAX_TURNS=$(bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-max-turns.sh qa .vbw-planning/config.json "$QA_EFFORT_PROFILE")
         if [ $? -ne 0 ]; then echo "$QA_MAX_TURNS" >&2; exit 1; fi
         ```
 
@@ -69,8 +69,8 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
         Summaries: {paths to SUMMARY.md files}
         Phase success criteria: {section from ROADMAP.md}
         If `.vbw-planning/codebase/META.md` exists, read CONVENTIONS.md, TESTING.md, CONCERNS.md, and ARCHITECTURE.md (whichever exist) from `.vbw-planning/codebase/` to bootstrap codebase understanding before verifying.
-        Verification protocol: `!`echo $CLAUDE_PLUGIN_ROOT`/references/verification-protocol.md
-        Return findings using the qa_verdict schema (see `!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md).
+        Verification protocol: `!`cat /tmp/.vbw-plugin-root`/references/verification-protocol.md
+        Return findings using the qa_verdict schema (see `!`cat /tmp/.vbw-plugin-root`/references/handoff-schemas.md).
         If tests reveal pre-existing failures unrelated to this phase, list them in your response under a "Pre-existing Issues" heading and include them in the qa_verdict payload's pre_existing_issues array.
         ```
 
@@ -107,4 +107,4 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
 ```
 This is **display-only**. Do NOT edit STATE.md, do NOT add todos, do NOT invoke /vbw:todo, and do NOT enter an interactive loop. The user decides whether to track these. If no discovered issues: omit the section entirely. After displaying discovered issues, STOP. Do not take further action.
 
-Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh qa {result}` and display.
+Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-next.sh qa {result}` and display.

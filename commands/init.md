@@ -15,7 +15,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 ## Context
 
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 Existing state:
 ```
@@ -116,22 +116,22 @@ See `docs/migration-gsd-to-vbw.md` for full field descriptions and usage example
      - Create directory: `mkdir -p .vbw-planning/gsd-archive`
      - Copy contents: `cp -r .planning/* .vbw-planning/gsd-archive/`
      - Display: "◆ Generating index..."
-     - Run: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/generate-gsd-index.sh`
+     - Run: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/generate-gsd-index.sh`
      - Display: "✓ GSD project archived to .vbw-planning/gsd-archive/ (indexed)"
      - Set GSD_IMPORTED=true flag for later steps
      - Proceed to Step 1
 
 ### Step 1: Scaffold directory
 
-Read each template from ``!`echo $CLAUDE_PLUGIN_ROOT`/templates/` and write to .vbw-planning/:
+Read each template from ``!`cat /tmp/.vbw-plugin-root`/templates/` and write to .vbw-planning/:
 
 | Target | Source |
 |--------|--------|
-| .vbw-planning/PROJECT.md | `!`echo $CLAUDE_PLUGIN_ROOT`/templates/PROJECT.md |
-| .vbw-planning/REQUIREMENTS.md | `!`echo $CLAUDE_PLUGIN_ROOT`/templates/REQUIREMENTS.md |
-| .vbw-planning/ROADMAP.md | `!`echo $CLAUDE_PLUGIN_ROOT`/templates/ROADMAP.md |
-| .vbw-planning/STATE.md | `!`echo $CLAUDE_PLUGIN_ROOT`/templates/STATE.md |
-| .vbw-planning/config.json | `!`echo $CLAUDE_PLUGIN_ROOT`/config/defaults.json |
+| .vbw-planning/PROJECT.md | `!`cat /tmp/.vbw-plugin-root`/templates/PROJECT.md |
+| .vbw-planning/REQUIREMENTS.md | `!`cat /tmp/.vbw-plugin-root`/templates/REQUIREMENTS.md |
+| .vbw-planning/ROADMAP.md | `!`cat /tmp/.vbw-plugin-root`/templates/ROADMAP.md |
+| .vbw-planning/STATE.md | `!`cat /tmp/.vbw-plugin-root`/templates/STATE.md |
+| .vbw-planning/config.json | `!`cat /tmp/.vbw-plugin-root`/config/defaults.json |
 
 Create `.vbw-planning/phases/`. Ensure config.json includes `"prefer_teams": "always"` and `"model_profile": "quality"`.
 
@@ -157,7 +157,7 @@ Then align git ignore behavior with config:
 
 ```bash
 PG_SCRIPT="$(ls -1 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/*/scripts/planning-git.sh 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1)"
-[ ! -f "$PG_SCRIPT" ] && PG_SCRIPT="`!`echo $CLAUDE_PLUGIN_ROOT`/scripts/planning-git.sh"
+[ ! -f "$PG_SCRIPT" ] && PG_SCRIPT="`!`cat /tmp/.vbw-plugin-root`/scripts/planning-git.sh"
 if [ -f "$PG_SCRIPT" ]; then
   bash "$PG_SCRIPT" sync-ignore .vbw-planning/config.json
 else
@@ -168,7 +168,7 @@ fi
 ### Step 1.5: Install git hooks
 
 1. `git rev-parse --git-dir` — if not a git repo, display "○ Git hooks skipped (not a git repository)" and skip
-2. Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/install-hooks.sh`, display based on output:
+2. Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/install-hooks.sh`, display based on output:
    - Contains "Installed": `✓ Git hooks installed (pre-push)`
    - Contains "already installed": `✓ Git hooks (already installed)`
 
@@ -195,11 +195,11 @@ Set GSD_ISOLATION_ENABLED=true for Step 3.5.
 - Store SOURCE_FILE_COUNT. Check for test files, CI/CD, Docker, monorepo indicators.
 - Add Codebase Profile to STATE.md.
 
-**2b.** Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/detect-stack.sh "$(pwd)"`. Save full JSON. Display: `✓ Stack: {comma-separated detected_stack items}`
+**2b.** Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/detect-stack.sh "$(pwd)"`. Save full JSON. Display: `✓ Stack: {comma-separated detected_stack items}`
 
 **2c. Codebase mapping (adaptive):**
 - Greenfield (BROWNFIELD=false): skip. Display: `○ Greenfield — skipping codebase mapping`
-- SOURCE_FILE_COUNT < 200: run map **inline** — read ``!`echo $CLAUDE_PLUGIN_ROOT`/commands/map.md` and follow directly
+- SOURCE_FILE_COUNT < 200: run map **inline** — read ``!`cat /tmp/.vbw-plugin-root`/commands/map.md` and follow directly
 - SOURCE_FILE_COUNT >= 200: run map **inline** (blocking) — display: `◆ Codebase mapping started ({SOURCE_FILE_COUNT} files)`. **Do NOT run in background.** The map MUST complete before proceeding to Step 3.
 
 **2d. find-skills bootstrap:** Check `find_skills_available` from detect-stack JSON.
@@ -216,7 +216,7 @@ Set GSD_ISOLATION_ENABLED=true for Step 3.5.
 
 **3b2. Auto-detect conventions:** If `.vbw-planning/codebase/PATTERNS.md` exists:
 - Read PATTERNS.md, ARCHITECTURE.md, STACK.md, CONCERNS.md
-- Extract conventions per ``!`echo $CLAUDE_PLUGIN_ROOT`/commands/teach.md` (Step R2)
+- Extract conventions per ``!`cat /tmp/.vbw-plugin-root`/commands/teach.md` (Step R2)
 - Write `.vbw-planning/conventions.json`. Display: `✓ {count} conventions auto-detected from codebase`
 
 If greenfield: write `{"conventions": []}`. Display: `○ Conventions — none yet (add with /vbw:teach)`
@@ -227,7 +227,7 @@ If greenfield: write `{"conventions": []}`. Display: `○ Conventions — none y
 
 **3e.** Write Skills section to STATE.md (SKIL-05 capability map). Protocol:
   1. **Discovery (SKIL-01):** Scan `CLAUDE_DIR/skills/` (global), `.claude/skills/` (project), `.claude/mcp.json` (mcp). Record name, scope, path per skill.
-  2. **Stack detection (SKIL-02):** Read ``!`echo $CLAUDE_PLUGIN_ROOT`/config/stack-mappings.json`. For each category, match `detect` patterns via Glob/file content. Collect `recommended_skills[]`.
+  2. **Stack detection (SKIL-02):** Read ``!`cat /tmp/.vbw-plugin-root`/config/stack-mappings.json`. For each category, match `detect` patterns via Glob/file content. Collect `recommended_skills[]`.
   3. **find-skills bootstrap (SKIL-06):** Check `CLAUDE_DIR/skills/find-skills/` or `~/.agents/skills/find-skills/`. If missing + `skill_suggestions=true`: offer install (`npx skills add vercel-labs/skills --skill find-skills -g -y`).
   4. **Suggestions (SKIL-03/04):** Compare recommended vs installed. Tag each `(curated)` or `(registry)`. If `auto_install_skills=true`: auto-install. Else: display with install commands.
   5. **Write STATE.md section:** Format: `### Skills` / `**Installed:** {list or "None detected"}` / `**Suggested:** {list or "None"}` / `**Stack detected:** {comma-separated}` / `**Registry available:** yes/no`
@@ -348,7 +348,7 @@ Run inference scripts based on the detected scenario, display results, and confi
 - Skip to Step 7 (discovery questions will be asked inline)
 
 **6b. Brownfield branch** (SCENARIO=BROWNFIELD):
-- Run inference: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/infer-project-context.sh .vbw-planning/codebase/ "$(pwd)"`
+- Run inference: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/infer-project-context.sh .vbw-planning/codebase/ "$(pwd)"`
 - Capture JSON output to `.vbw-planning/inference.json` via Bash
 - Parse the JSON and display inferred fields:
   ```
@@ -362,9 +362,9 @@ Run inference scripts based on the detected scenario, display results, and confi
 - For null fields, display: `{field}: (not detected)` — always show every field
 
 **6c. GSD Migration branch** (SCENARIO=GSD_MIGRATION):
-- Run GSD inference: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/infer-gsd-summary.sh .vbw-planning/gsd-archive/`
+- Run GSD inference: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/infer-gsd-summary.sh .vbw-planning/gsd-archive/`
 - Capture JSON output to `.vbw-planning/gsd-inference.json` via Bash
-- If `.vbw-planning/codebase/` exists, also run: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/infer-project-context.sh .vbw-planning/codebase/ "$(pwd)"`
+- If `.vbw-planning/codebase/` exists, also run: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/infer-project-context.sh .vbw-planning/codebase/ "$(pwd)"`
   - Capture to `.vbw-planning/inference.json`
 - Display merged results:
   ```
@@ -431,14 +431,14 @@ If SKIP_INFERENCE=false (confirmed/corrected inference data):
   2. "What phases do you envision?" (pre-fill from GSD recent_phases if available)
 
 **7b. Generate PROJECT.md:**
-- Run: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/bootstrap/bootstrap-project.sh .vbw-planning/PROJECT.md "$NAME" "$DESCRIPTION"`
+- Run: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/bootstrap/bootstrap-project.sh .vbw-planning/PROJECT.md "$NAME" "$DESCRIPTION"`
 - Display: `✓ PROJECT.md`
 
 **7c. Generate REQUIREMENTS.md:**
 - Create `.vbw-planning/discovery.json` with format: `{"answered": [...], "inferred": [...]}`
   - `answered`: array of requirement strings from user answers
   - `inferred`: array of `{"text": "...", "priority": "Must-have"}` from inference features
-- Run: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/bootstrap/bootstrap-requirements.sh .vbw-planning/REQUIREMENTS.md .vbw-planning/discovery.json`
+- Run: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/bootstrap/bootstrap-requirements.sh .vbw-planning/REQUIREMENTS.md .vbw-planning/discovery.json`
 - Display: `✓ REQUIREMENTS.md`
 
 **7d. Generate ROADMAP.md:**
@@ -446,18 +446,18 @@ If SKIP_INFERENCE=false (confirmed/corrected inference data):
   - Build from user-provided phase names/goals
   - Link requirements from discovery data
   - Generate success criteria from phase goals
-- Run: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/bootstrap/bootstrap-roadmap.sh .vbw-planning/ROADMAP.md "$NAME" .vbw-planning/phases.json`
+- Run: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/bootstrap/bootstrap-roadmap.sh .vbw-planning/ROADMAP.md "$NAME" .vbw-planning/phases.json`
 - Display: `✓ ROADMAP.md`
 
 **7e. Generate STATE.md:**
 - Determine MILESTONE_NAME: use NAME or first milestone from GSD inference
 - Determine PHASE_COUNT from phases.json length
-- Run: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/bootstrap/bootstrap-state.sh .vbw-planning/STATE.md "$NAME" "$MILESTONE_NAME" "$PHASE_COUNT"`
+- Run: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/bootstrap/bootstrap-state.sh .vbw-planning/STATE.md "$NAME" "$MILESTONE_NAME" "$PHASE_COUNT"`
 - Display: `✓ STATE.md`
 
 **7f. Generate/update CLAUDE.md:**
 - If root CLAUDE.md exists: pass it as EXISTING_PATH to preserve non-VBW content
-- Run: `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/bootstrap/bootstrap-claude.sh CLAUDE.md "$NAME" "$DESCRIPTION" "CLAUDE.md"`
+- Run: `bash `!`cat /tmp/.vbw-plugin-root`/scripts/bootstrap/bootstrap-claude.sh CLAUDE.md "$NAME" "$DESCRIPTION" "CLAUDE.md"`
   - If CLAUDE.md does not exist yet, omit the last argument
 - Display: `✓ CLAUDE.md`
 
@@ -469,7 +469,7 @@ If SKIP_INFERENCE=false (confirmed/corrected inference data):
 - Run:
   ```bash
   PG_SCRIPT="$(ls -1 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/*/scripts/planning-git.sh 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1)"
-  [ ! -f "$PG_SCRIPT" ] && PG_SCRIPT="`!`echo $CLAUDE_PLUGIN_ROOT`/scripts/planning-git.sh"
+  [ ! -f "$PG_SCRIPT" ] && PG_SCRIPT="`!`cat /tmp/.vbw-plugin-root`/scripts/planning-git.sh"
   if [ -f "$PG_SCRIPT" ]; then
     bash "$PG_SCRIPT" commit-boundary "bootstrap project files" .vbw-planning/config.json
   else

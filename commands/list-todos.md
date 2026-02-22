@@ -11,7 +11,7 @@ allowed-tools: Read, Edit, Bash, AskUserQuestion
 ## Context
 
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 ## Guard
 
@@ -19,12 +19,12 @@ Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DI
 
 ## Steps
 
-1. **Load todos:** Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/list-todos.sh {priority-filter}` (omit filter arg if none provided). Parse the JSON output.
+1. **Load todos:** Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/list-todos.sh {priority-filter}` (omit filter arg if none provided). Parse the JSON output.
 
 2. **Handle status:**
    - `"error"`: STOP with the `message` value.
-   - `"empty"`: Display the `display` value. Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh list-todos empty` and display. Exit.
-   - `"no-match"`: Display the `display` value. Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh list-todos empty` and display. Exit.
+   - `"empty"`: Display the `display` value. Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-next.sh list-todos empty` and display. Exit.
+   - `"no-match"`: Display the `display` value. Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-next.sh list-todos empty` and display. Exit.
    - `"ok"`: Continue to step 3.
 
 3. **Display list:** Show the `display` value from the script output, followed by:
@@ -55,7 +55,7 @@ Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DI
      ➜ Run: /vbw:{command} {todo text}
      ```
      Do NOT execute the command. STOP after displaying the suggested command.
-   - **Remove:** Remove the `line` value from the todo section in STATE.md. If no todos remain, replace with "None." Log to `## Recent Activity` with format `- {YYYY-MM-DD}: Removed todo: {text}`. Confirm: "✓ Todo removed." Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh list-todos` and display.
+   - **Remove:** Remove the `line` value from the todo section in STATE.md. If no todos remain, replace with "None." Log to `## Recent Activity` with format `- {YYYY-MM-DD}: Removed todo: {text}`. Confirm: "✓ Todo removed." Run `bash `!`cat /tmp/.vbw-plugin-root`/scripts/suggest-next.sh list-todos` and display.
    - **Back:** Return to step 3.
 
 ## Output Format

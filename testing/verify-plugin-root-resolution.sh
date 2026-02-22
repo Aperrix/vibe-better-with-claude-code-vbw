@@ -3,22 +3,24 @@ set -euo pipefail
 
 # verify-plugin-root-resolution.sh — Ensure CLAUDE_PLUGIN_ROOT resolves deterministically
 #
-# Problem: ${CLAUDE_PLUGIN_ROOT} is available in Claude Code's process env (for !` backtick
-# and @ file references) but NOT in the Bash tool's shell environment. Model-executed
-# bash commands that reference ${CLAUDE_PLUGIN_ROOT} expand it to an empty string.
+# Problem: ${CLAUDE_PLUGIN_ROOT} is available in Claude Code's process env (for @ file
+# references) but NOT in the Bash tool's shell environment or !` backtick subprocesses.
+# Model-executed bash commands that reference ${CLAUDE_PLUGIN_ROOT} expand to empty.
 #
-# Fix: Every model-executed ${CLAUDE_PLUGIN_ROOT} is replaced with an inline !` backtick
-# expression `!`echo $CLAUDE_PLUGIN_ROOT` that resolves at command load time. The model
-# sees the actual absolute path, never the variable.
+# Fix: Each command file resolves the plugin root ONCE at load time (via !` backtick with
+# a fallback ls chain) and writes it to /tmp/.vbw-plugin-root. All subsequent references
+# use `!`cat /tmp/.vbw-plugin-root` (load-time) or $(cat /tmp/.vbw-plugin-root) (runtime).
 #
 # Safe contexts (all refs must be in one of these):
-#   - `!`echo $CLAUDE_PLUGIN_ROOT`   (inline load-time resolution — the standard pattern)
-#   - !`...${CLAUDE_PLUGIN_ROOT}...` (preamble/context load-time bash)
-#   - @${CLAUDE_PLUGIN_ROOT}/...     (file inclusion at load time)
-#   - Plugin root: ...               (preamble display line)
+#   - cat /tmp/.vbw-plugin-root           (temp file read — standard pattern)
+#   - !`...${CLAUDE_PLUGIN_ROOT:-...}...` (resolve line with fallback)
+#   - @${CLAUDE_PLUGIN_ROOT}/...         (file inclusion at load time)
+#   - Plugin root: ...                   (preamble resolve+write line)
+#   - printf.*vbw-plugin-root            (write to temp file)
 #
 # Unsafe (must not exist):
 #   - bare ${CLAUDE_PLUGIN_ROOT} in model-executed text (resolves to empty in bash)
+#   - `!`echo $CLAUDE_PLUGIN_ROOT` without fallback (resolves to empty in subshell)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMMANDS_DIR="$ROOT/commands"
@@ -97,8 +99,8 @@ for file in "$COMMANDS_DIR"/*.md "$REFERENCES_DIR"/*.md; do
   base="$(basename "$file" .md)"
 
   # Only check preamble !` backtick expressions (those using ${CLAUDE_PLUGIN_ROOT} with braces).
-  # Inline `!`echo $CLAUDE_PLUGIN_ROOT` patterns (without braces) are intentionally bare —
-  # they rely on CLAUDE_PLUGIN_ROOT always being set at load time and don't need a fallback.
+  # These are resolve-and-write lines that resolve the plugin root with a fallback chain
+  # and write the result to /tmp/.vbw-plugin-root for subsequent use.
   backtick_lines=$(grep -n 'CLAUDE_PLUGIN_ROOT' "$file" \
     | grep '!`[^`]*\${CLAUDE_PLUGIN_ROOT' || true)
 

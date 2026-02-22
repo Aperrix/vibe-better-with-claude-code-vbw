@@ -12,7 +12,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, WebFetch
 ## Context
 
 Working directory: `!`pwd``
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 Existing mapping: `!`ls .vbw-planning/codebase/ 2>/dev/null || echo "No codebase mapping found"``
 META.md:
 ```
@@ -72,17 +72,17 @@ Display ✓ per domain. After all 7 docs written, skip Step 3.5, go to Step 4.
 
 **Step 3-duo:** Create Agent Team with 2 Scouts via TaskCreate:
 
-Scout A (Tech + Architecture): analyze tech stack, deps, architecture, structure. Send 2 scout_findings messages (domain: "tech-stack" with STACK.md+DEPENDENCIES.md, domain: "architecture" with ARCHITECTURE.md+STRUCTURE.md). Mode: {MAPPING_MODE}. Schema ref: ``!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md`
+Scout A (Tech + Architecture): analyze tech stack, deps, architecture, structure. Send 2 scout_findings messages (domain: "tech-stack" with STACK.md+DEPENDENCIES.md, domain: "architecture" with ARCHITECTURE.md+STRUCTURE.md). Mode: {MAPPING_MODE}. Schema ref: ``!`cat /tmp/.vbw-plugin-root`/references/handoff-schemas.md`
 
-Scout B (Quality + Concerns): analyze quality, conventions, testing, debt, risks. Send 2 scout_findings messages (domain: "quality" with CONVENTIONS.md+TESTING.md, domain: "concerns" with CONCERNS.md). Mode: {MAPPING_MODE}. Schema ref: ``!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md`
+Scout B (Quality + Concerns): analyze quality, conventions, testing, debt, risks. Send 2 scout_findings messages (domain: "quality" with CONVENTIONS.md+TESTING.md, domain: "concerns" with CONCERNS.md). Mode: {MAPPING_MODE}. Schema ref: ``!`cat /tmp/.vbw-plugin-root`/references/handoff-schemas.md`
 
 **Scout model (effort-gated):** Fast/Turbo: `Model: haiku`. Thorough/Balanced: inherit session model.
-**Scout turn budget (effort-gated):** Resolve with `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}"` and pass `maxTurns: ${SCOUT_MAX_TURNS}` to each Scout TaskCreate.
+**Scout turn budget (effort-gated):** Resolve with `bash `!`cat /tmp/.vbw-plugin-root`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}"` and pass `maxTurns: ${SCOUT_MAX_TURNS}` to each Scout TaskCreate.
 Wait for all findings. Proceed to Step 3.5.
 
 ---
 
-**Step 3-quad:** Create Agent Team with 4 Scouts via TaskCreate. Each sends scout_findings with their domain. Schema ref: ``!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md`
+**Step 3-quad:** Create Agent Team with 4 Scouts via TaskCreate. Each sends scout_findings with their domain. Schema ref: ``!`cat /tmp/.vbw-plugin-root`/references/handoff-schemas.md`
 - Scout 1 (Tech Stack): STACK.md + DEPENDENCIES.md
 - Scout 2 (Architecture): ARCHITECTURE.md + STRUCTURE.md
 - Scout 3 (Quality): CONVENTIONS.md + TESTING.md

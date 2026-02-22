@@ -11,16 +11,16 @@ allowed-tools: Read, Glob
 
 ## Context
 
-Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}``
+Plugin root: `!`R=${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/* 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1')}; printf '%s' "$R" > /tmp/.vbw-plugin-root; echo "$R"`
 
 ## Guard
 
-1. **Missing changelog:** ``!`echo $CLAUDE_PLUGIN_ROOT`/CHANGELOG.md` missing → STOP: "No CHANGELOG.md found."
+1. **Missing changelog:** ``!`cat /tmp/.vbw-plugin-root`/CHANGELOG.md` missing → STOP: "No CHANGELOG.md found."
 
 ## Steps
 
-1. Read ``!`echo $CLAUDE_PLUGIN_ROOT`/VERSION` for current_version.
-2. Read ``!`echo $CLAUDE_PLUGIN_ROOT`/CHANGELOG.md`, split by `## [` headings.
+1. Read ``!`cat /tmp/.vbw-plugin-root`/VERSION` for current_version.
+2. Read ``!`cat /tmp/.vbw-plugin-root`/CHANGELOG.md`, split by `## [` headings.
    - With version arg: show entries newer than that version.
    - No args: show current version's entry.
 3. Display Phase Banner "VBW Changelog" with version context, entries, Next Up (/vbw:help). No entries: "✓ No changelog entry found for v{version}."
