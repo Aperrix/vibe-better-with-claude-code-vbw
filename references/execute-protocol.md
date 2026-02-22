@@ -413,7 +413,7 @@ AUTO_UAT=$(jq -r '.auto_uat // false' .vbw-planning/config.json)
 
 If `AUTO_UAT` is not `true` and autonomy is confident or pure-vibe: display "○ UAT verification skipped (autonomy: {level})" and proceed to Step 5.
 
-**UAT execution (cautious + standard):**
+**UAT execution:**
 
 1. Check if `{phase-dir}/{phase}-UAT.md` already exists with `status: complete`. If so: "○ UAT already complete" and proceed to Step 5.
 2. Generate test scenarios from completed SUMMARY.md files (same logic as `commands/verify.md`).

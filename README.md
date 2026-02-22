@@ -641,9 +641,9 @@ Autonomy interacts with effort profiles. At `cautious`, plan approval expands to
 | "Already complete" warning | Confirm | Confirm | Skip | Skip |
 | Plan approval (Thorough) | Required | Required | Off | Off |
 | Plan approval (Balanced) | Required | Off | Off | Off |
-| UAT after QA | Suggest | Suggest | Skip | Skip |
+| UAT after QA | Run | Run | Skip | Skip |
 
-**`auto_uat`** — When `true`, VBW always suggests running `/vbw:verify` after QA passes, regardless of autonomy level. Normally, UAT is only suggested at `cautious` and `standard` autonomy. Set `auto_uat` to `true` if you want verification at every autonomy level, including `confident` and `pure-vibe`.
+**`auto_uat`** — When `true`, VBW automatically runs UAT verification after QA passes during the `/vbw:vibe` execution flow, regardless of autonomy level. Normally, UAT only runs at `cautious` and `standard` autonomy. With `auto_uat` enabled, UAT runs inline at every level, including `confident` and `pure-vibe`. When running standalone `/vbw:qa`, the "Next Up" block will suggest `/vbw:verify` instead.
 
 ```text
 /vbw:config auto_uat true
