@@ -23,9 +23,9 @@ Read the **cached** version (what user actually has installed):
 ```bash
 cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/*/VERSION 2>/dev/null | sort -V | tail -1
 ```
-Store as `old_version`. If empty, fall back to `${CLAUDE_PLUGIN_ROOT}/VERSION`.
+Store as `old_version`. If empty, fall back to ``!`echo $CLAUDE_PLUGIN_ROOT`/VERSION`.
 
-**CRITICAL:** Do NOT read `${CLAUDE_PLUGIN_ROOT}/VERSION` as primary — in dev sessions it resolves to source repo (may be ahead), causing false "already up to date."
+**CRITICAL:** Do NOT read ``!`echo $CLAUDE_PLUGIN_ROOT`/VERSION` as primary — in dev sessions it resolves to source repo (may be ahead), causing false "already up to date."
 
 ### Step 2: Handle --check
 
@@ -42,7 +42,7 @@ If remote == old: display "✓ Already at latest (v{old_version}). Refreshing ca
 ### Step 4: Nuclear cache wipe
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/cache-nuke.sh
+bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/cache-nuke.sh
 ```
 Removes CLAUDE_DIR/plugins/cache/vbw-marketplace/vbw/, CLAUDE_DIR/commands/vbw/, /tmp/vbw-* for pristine update.
 
@@ -68,7 +68,7 @@ Try in order (stop at first success):
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 rm -rf "$CLAUDE_DIR/commands/vbw" 2>/dev/null
 ```
-This removes stale copies that break `${CLAUDE_PLUGIN_ROOT}` resolution. Commands load from the plugin cache where `${CLAUDE_PLUGIN_ROOT}` is guaranteed.
+This removes stale copies that break ``!`echo $CLAUDE_PLUGIN_ROOT`` resolution. Commands load from the plugin cache where ``!`echo $CLAUDE_PLUGIN_ROOT`` is guaranteed.
 
 ### Step 5.5: Ensure VBW statusline
 

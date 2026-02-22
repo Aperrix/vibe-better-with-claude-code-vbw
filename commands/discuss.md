@@ -34,4 +34,4 @@ Phase state:
 
 ## Execute
 
-Read `${CLAUDE_PLUGIN_ROOT}/references/discussion-engine.md` and follow its protocol for the target phase.
+Read ``!`echo $CLAUDE_PLUGIN_ROOT`/references/discussion-engine.md` and follow its protocol for the target phase.

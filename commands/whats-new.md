@@ -15,12 +15,12 @@ Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DI
 
 ## Guard
 
-1. **Missing changelog:** `${CLAUDE_PLUGIN_ROOT}/CHANGELOG.md` missing → STOP: "No CHANGELOG.md found."
+1. **Missing changelog:** ``!`echo $CLAUDE_PLUGIN_ROOT`/CHANGELOG.md` missing → STOP: "No CHANGELOG.md found."
 
 ## Steps
 
-1. Read `${CLAUDE_PLUGIN_ROOT}/VERSION` for current_version.
-2. Read `${CLAUDE_PLUGIN_ROOT}/CHANGELOG.md`, split by `## [` headings.
+1. Read ``!`echo $CLAUDE_PLUGIN_ROOT`/VERSION` for current_version.
+2. Read ``!`echo $CLAUDE_PLUGIN_ROOT`/CHANGELOG.md`, split by `## [` headings.
    - With version arg: show entries newer than that version.
    - No args: show current version's entry.
 3. Display Phase Banner "VBW Changelog" with version context, entries, Next Up (/vbw:help). No entries: "✓ No changelog entry found for v{version}."

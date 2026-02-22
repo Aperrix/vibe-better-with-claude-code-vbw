@@ -22,7 +22,7 @@ Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-$(bash -c 'ls -1d "${CLAUDE_CONFIG_DI
 ## Steps
 
 1. **Resolve context:** Always use `.vbw-planning/STATE.md` for todos — project-level data lives at the root, not in milestone subdirectories. If `.vbw-planning/STATE.md` does not exist:
-   - **Archived milestones exist** (any `.vbw-planning/milestones/*/STATE.md`): Recover by running `bash ${CLAUDE_PLUGIN_ROOT}/scripts/migrate-orphaned-state.sh .vbw-planning` — this picks the most recent archived milestone by modification time and creates root STATE.md.
+   - **Archived milestones exist** (any `.vbw-planning/milestones/*/STATE.md`): Recover by running `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/migrate-orphaned-state.sh .vbw-planning` — this picks the most recent archived milestone by modification time and creates root STATE.md.
    - **No STATE.md anywhere:** STOP: "STATE.md not found. Run /vbw:init to set up your project."
 2. **Parse args:** Description (non-flag text), --priority (default: normal). Format: high=`[HIGH]`, normal=plain, low=`[low]`. Append `(added {YYYY-MM-DD})`.
 3. **Add to STATE.md:** Find `## Todos` section. Replace "None." / placeholder or append after last item.

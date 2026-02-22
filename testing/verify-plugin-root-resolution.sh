@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# verify-plugin-root-resolution.sh — Ensure CLAUDE_PLUGIN_ROOT is resolvable in all commands
+# verify-plugin-root-resolution.sh — Ensure CLAUDE_PLUGIN_ROOT resolves deterministically
 #
 # Problem: ${CLAUDE_PLUGIN_ROOT} is available in Claude Code's process env (for !` backtick
-# and @ file references) but NOT in the Bash tool's shell environment. Commands that
-# reference ${CLAUDE_PLUGIN_ROOT} in regular code blocks (model-executed bash) must expose
-# the resolved path via a !` backtick preamble so the model can see the actual path.
+# and @ file references) but NOT in the Bash tool's shell environment. Model-executed
+# bash commands that reference ${CLAUDE_PLUGIN_ROOT} expand it to an empty string.
 #
-# Rule: Any command .md file that references ${CLAUDE_PLUGIN_ROOT} outside of safe contexts
-# (!` backtick expressions or @ file references) MUST contain a Plugin root preamble:
-#   Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT}``
+# Fix: Every model-executed ${CLAUDE_PLUGIN_ROOT} is replaced with an inline !` backtick
+# expression `!`echo $CLAUDE_PLUGIN_ROOT` that resolves at command load time. The model
+# sees the actual absolute path, never the variable.
 #
-# Safe contexts (no preamble needed):
-#   - !`...${CLAUDE_PLUGIN_ROOT}...`       (executed at command load time)
-#   - @${CLAUDE_PLUGIN_ROOT}/...           (file inclusion at load time)
+# Safe contexts (all refs must be in one of these):
+#   - `!`echo $CLAUDE_PLUGIN_ROOT`   (inline load-time resolution — the standard pattern)
+#   - !`...${CLAUDE_PLUGIN_ROOT}...` (preamble/context load-time bash)
+#   - @${CLAUDE_PLUGIN_ROOT}/...     (file inclusion at load time)
+#   - Plugin root: ...               (preamble display line)
 #
-# Unsafe contexts (preamble required):
-#   - bash ${CLAUDE_PLUGIN_ROOT}/scripts/... (in regular code blocks)
-#   - Read ${CLAUDE_PLUGIN_ROOT}/...         (model instruction text)
-#   - ${CLAUDE_PLUGIN_ROOT}/VERSION          (file path in narrative)
+# Unsafe (must not exist):
+#   - bare ${CLAUDE_PLUGIN_ROOT} in model-executed text (resolves to empty in bash)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMMANDS_DIR="$ROOT/commands"
+REFERENCES_DIR="$ROOT/references"
 
 PASS=0
 FAIL=0
@@ -37,9 +37,9 @@ fail() {
   FAIL=$((FAIL + 1))
 }
 
-echo "=== Plugin Root Resolution Verification ==="
+echo "=== Plugin Root Inline Resolution Verification ==="
 
-for file in "$COMMANDS_DIR"/*.md; do
+for file in "$COMMANDS_DIR"/*.md "$REFERENCES_DIR"/*.md; do
   base="$(basename "$file" .md)"
 
   # Skip files with no CLAUDE_PLUGIN_ROOT references at all
@@ -52,28 +52,25 @@ for file in "$COMMANDS_DIR"/*.md; do
   total_refs=$(grep -c 'CLAUDE_PLUGIN_ROOT' "$file" || true)
 
   # Count lines with CLAUDE_PLUGIN_ROOT that are NOT in any safe context.
-  # A line is safe if it matches: !` backtick expression, @ file reference, or the preamble itself.
-  # We pipeline grep to filter out safe lines, then count what remains.
-  # The preamble may be the simple form (echo ${CLAUDE_PLUGIN_ROOT}) or the
-  # dual-fallback form (echo ${CLAUDE_PLUGIN_ROOT:-$(ls ...)}).
+  # Safe contexts: !` backtick expressions, @ file references, Plugin root: preamble,
+  # and inline `!`echo $CLAUDE_PLUGIN_ROOT` resolution patterns.
   unsafe_count=$(grep 'CLAUDE_PLUGIN_ROOT' "$file" \
     | grep -v '!`[^`]*CLAUDE_PLUGIN_ROOT' \
     | grep -v '@${CLAUDE_PLUGIN_ROOT}' \
     | grep -v 'Plugin root:' \
-    | grep -vc '`!`echo \${CLAUDE_PLUGIN_ROOT' || true)
+    | grep -vc '`!`echo .*CLAUDE_PLUGIN_ROOT' || true)
 
-  # If no unsafe references, no preamble needed
   if [ "$unsafe_count" -eq 0 ]; then
-    pass "$base: all $total_refs references are in safe contexts (! backtick or @ file ref)"
-    continue
-  fi
-
-  # There are unsafe references — check for the preamble (simple or dual-fallback form)
-  if grep -q 'Plugin root:.*!`echo \${CLAUDE_PLUGIN_ROOT' "$file"; then
-    pass "$base: has Plugin root preamble ($unsafe_count model-executed refs resolved)"
+    pass "$base: all $total_refs references are in safe contexts (inline !-backtick or @ file ref)"
   else
-    fail "$base: $unsafe_count CLAUDE_PLUGIN_ROOT refs in model-executed context but no Plugin root preamble"
-    echo "      Add to Context section: Plugin root: \`!\`echo \${CLAUDE_PLUGIN_ROOT}\`\`"
+    fail "$base: $unsafe_count CLAUDE_PLUGIN_ROOT refs in model-executed context (not inline-resolved)"
+    # Show the offending lines for debugging
+    grep -n 'CLAUDE_PLUGIN_ROOT' "$file" \
+      | grep -v '!`[^`]*CLAUDE_PLUGIN_ROOT' \
+      | grep -v '@${CLAUDE_PLUGIN_ROOT}' \
+      | grep -v 'Plugin root:' \
+      | grep -v '`!`echo .*CLAUDE_PLUGIN_ROOT' \
+      | while IFS= read -r line; do echo "      $line"; done
   fi
 done
 
@@ -86,52 +83,51 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-echo "All plugin root resolution checks passed."
+echo "All plugin root inline resolution checks passed."
 echo ""
 
-# --- Phase 2: Verify !` backtick expansions have CLAUDE_CONFIG_DIR fallback ---
-echo "=== Backtick Expansion Fallback Verification ==="
-echo "(Ensures !-backtick CLAUDE_PLUGIN_ROOT refs include :-fallback for non-standard CLAUDE_CONFIG_DIR)"
+# --- Phase 2: Verify preamble !` backtick expansions have CLAUDE_CONFIG_DIR fallback ---
+echo "=== Preamble Fallback Verification ==="
+echo "(Ensures preamble !-backtick CLAUDE_PLUGIN_ROOT refs include :-fallback for non-standard installs)"
 
 PASS2=0
 FAIL2=0
 
-for file in "$COMMANDS_DIR"/*.md; do
+for file in "$COMMANDS_DIR"/*.md "$REFERENCES_DIR"/*.md; do
   base="$(basename "$file" .md)"
 
-  # Extract lines that are !` backtick expansions referencing CLAUDE_PLUGIN_ROOT
-  # These execute at load time in the shell — env var must be set OR have fallback
+  # Only check preamble !` backtick expressions (those using ${CLAUDE_PLUGIN_ROOT} with braces).
+  # Inline `!`echo $CLAUDE_PLUGIN_ROOT` patterns (without braces) are intentionally bare —
+  # they rely on CLAUDE_PLUGIN_ROOT always being set at load time and don't need a fallback.
   backtick_lines=$(grep -n 'CLAUDE_PLUGIN_ROOT' "$file" \
-    | grep '!`[^`]*CLAUDE_PLUGIN_ROOT' || true)
+    | grep '!`[^`]*\${CLAUDE_PLUGIN_ROOT' || true)
 
   [ -z "$backtick_lines" ] && continue
 
   # For each matching line, check it uses the :- fallback pattern
   has_bare=0
   while IFS= read -r match; do
-    # Skip if empty
     [ -z "$match" ] && continue
-    # Check for :- fallback (CLAUDE_PLUGIN_ROOT:-$(...))
     if echo "$match" | grep -q 'CLAUDE_PLUGIN_ROOT:-'; then
       : # has fallback, safe
     else
       has_bare=1
       lineno="${match%%:*}"
-      echo "  BARE  $base:$lineno — missing :-fallback in !-backtick expansion"
+      echo "  BARE  $base:$lineno — missing :-fallback in preamble !-backtick expansion"
     fi
   done <<< "$backtick_lines"
 
   if [ "$has_bare" -eq 0 ]; then
-    echo "PASS  $base: all !-backtick CLAUDE_PLUGIN_ROOT refs have :-fallback"
+    echo "PASS  $base: all preamble !-backtick CLAUDE_PLUGIN_ROOT refs have :-fallback"
     PASS2=$((PASS2 + 1))
   else
-    fail "$base: has !-backtick CLAUDE_PLUGIN_ROOT without :-fallback (breaks non-standard CLAUDE_CONFIG_DIR)"
+    fail "$base: has preamble !-backtick CLAUDE_PLUGIN_ROOT without :-fallback"
     FAIL2=$((FAIL2 + 1))
   fi
 done
 
 if [ "$PASS2" -eq 0 ] && [ "$FAIL2" -eq 0 ]; then
-  echo "(no !-backtick CLAUDE_PLUGIN_ROOT expansions found — nothing to check)"
+  echo "(no preamble !-backtick CLAUDE_PLUGIN_ROOT expansions found — nothing to check)"
 fi
 
 echo ""
@@ -143,5 +139,5 @@ if [ "$FAIL2" -gt 0 ]; then
   exit 1
 fi
 
-echo "All backtick fallback checks passed."
+echo "All preamble fallback checks passed."
 exit 0

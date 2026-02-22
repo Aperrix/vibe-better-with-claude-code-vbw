@@ -14,9 +14,9 @@ load test_helper
   [ "$count" -ge 8 ]
 }
 
-@test "planning-git callsites use CLAUDE_PLUGIN_ROOT colon-plus fallback" {
+@test "planning-git callsites use inline PLUGIN_ROOT fallback" {
   local count
-  count=$(grep -R -c 'CLAUDE_PLUGIN_ROOT:+' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
+  count=$(grep -R -c '`!`echo.*CLAUDE_PLUGIN_ROOT.*planning-git' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
   [[ "$count" =~ ^[0-9]+$ ]]
   [ "$count" -ge 8 ]
 }
@@ -37,7 +37,7 @@ load test_helper
   for f in "${files[@]}"; do
     local cache_lines plugin_lines cache_count plugin_count
     cache_lines=$(grep -n 'ls -1.*plugins/cache/vbw-marketplace.*planning-git' "$f" | cut -d: -f1)
-    plugin_lines=$(grep -n 'CLAUDE_PLUGIN_ROOT:+' "$f" | cut -d: -f1)
+    plugin_lines=$(grep -n '`!`echo.*CLAUDE_PLUGIN_ROOT.*planning-git' "$f" | cut -d: -f1)
     cache_count=$(echo "$cache_lines" | wc -l | tr -d ' ')
     plugin_count=$(echo "$plugin_lines" | wc -l | tr -d ' ')
     [ "$cache_count" = "$plugin_count" ] || { echo "Unequal pair count in $f: cache=$cache_count plugin=$plugin_count"; false; }
@@ -63,7 +63,7 @@ load test_helper
   # Ensures no additive bad-form callsites — cache ls count must equal fallback count (F4)
   local cache_count fallback_count
   cache_count=$(grep -R -c 'ls -1.*plugins/cache/vbw-marketplace/vbw.*planning-git.sh' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
-  fallback_count=$(grep -R -c 'CLAUDE_PLUGIN_ROOT:+' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
+  fallback_count=$(grep -R -c '`!`echo.*CLAUDE_PLUGIN_ROOT.*planning-git' "$PROJECT_ROOT/commands" "$PROJECT_ROOT/references" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
   [ "$cache_count" = "$fallback_count" ] || { echo "Mismatched: cache=$cache_count fallback=$fallback_count"; false; }
 }
 

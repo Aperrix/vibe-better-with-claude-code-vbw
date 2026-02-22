@@ -72,17 +72,17 @@ Display ✓ per domain. After all 7 docs written, skip Step 3.5, go to Step 4.
 
 **Step 3-duo:** Create Agent Team with 2 Scouts via TaskCreate:
 
-Scout A (Tech + Architecture): analyze tech stack, deps, architecture, structure. Send 2 scout_findings messages (domain: "tech-stack" with STACK.md+DEPENDENCIES.md, domain: "architecture" with ARCHITECTURE.md+STRUCTURE.md). Mode: {MAPPING_MODE}. Schema ref: `${CLAUDE_PLUGIN_ROOT}/references/handoff-schemas.md`
+Scout A (Tech + Architecture): analyze tech stack, deps, architecture, structure. Send 2 scout_findings messages (domain: "tech-stack" with STACK.md+DEPENDENCIES.md, domain: "architecture" with ARCHITECTURE.md+STRUCTURE.md). Mode: {MAPPING_MODE}. Schema ref: ``!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md`
 
-Scout B (Quality + Concerns): analyze quality, conventions, testing, debt, risks. Send 2 scout_findings messages (domain: "quality" with CONVENTIONS.md+TESTING.md, domain: "concerns" with CONCERNS.md). Mode: {MAPPING_MODE}. Schema ref: `${CLAUDE_PLUGIN_ROOT}/references/handoff-schemas.md`
+Scout B (Quality + Concerns): analyze quality, conventions, testing, debt, risks. Send 2 scout_findings messages (domain: "quality" with CONVENTIONS.md+TESTING.md, domain: "concerns" with CONCERNS.md). Mode: {MAPPING_MODE}. Schema ref: ``!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md`
 
 **Scout model (effort-gated):** Fast/Turbo: `Model: haiku`. Thorough/Balanced: inherit session model.
-**Scout turn budget (effort-gated):** Resolve with `bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}"` and pass `maxTurns: ${SCOUT_MAX_TURNS}` to each Scout TaskCreate.
+**Scout turn budget (effort-gated):** Resolve with `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}"` and pass `maxTurns: ${SCOUT_MAX_TURNS}` to each Scout TaskCreate.
 Wait for all findings. Proceed to Step 3.5.
 
 ---
 
-**Step 3-quad:** Create Agent Team with 4 Scouts via TaskCreate. Each sends scout_findings with their domain. Schema ref: `${CLAUDE_PLUGIN_ROOT}/references/handoff-schemas.md`
+**Step 3-quad:** Create Agent Team with 4 Scouts via TaskCreate. Each sends scout_findings with their domain. Schema ref: ``!`echo $CLAUDE_PLUGIN_ROOT`/references/handoff-schemas.md`
 - Scout 1 (Tech Stack): STACK.md + DEPENDENCIES.md
 - Scout 2 (Architecture): ARCHITECTURE.md + STRUCTURE.md
 - Scout 3 (Quality): CONVENTIONS.md + TESTING.md

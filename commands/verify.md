@@ -152,4 +152,4 @@ This is **display-only**. Do NOT edit STATE.md, do NOT add todos, do NOT invoke 
   - All issues are `minor`:
     - `Suggest /vbw:fix to address recorded issues.`
 
-Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh verify {result} {phase}` and display.
+Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh verify {result} {phase}` and display.

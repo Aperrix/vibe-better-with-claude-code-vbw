@@ -29,7 +29,7 @@ If no .vbw-planning/ dir: STOP "Run /vbw:init first." (check `.vbw-planning/conf
 Before any read/write behavior below, run:
 
 ```bash
-MIGRATED_COUNT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/migrate-config.sh --print-added .vbw-planning/config.json 2>/dev/null)
+MIGRATED_COUNT=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/migrate-config.sh --print-added .vbw-planning/config.json 2>/dev/null)
 if [ $? -ne 0 ] || [ -z "${MIGRATED_COUNT:-}" ]; then
   echo "⚠ Config migration failed (invalid JSON). Fix .vbw-planning/config.json, then retry /vbw:config"
   exit 0
@@ -53,12 +53,12 @@ echo ""
 echo "Model Profile: $PROFILE"
 echo "Agent Models:"
 # Resolve each agent model
-LEAD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh lead .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-DEV=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh dev .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-QA=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh qa .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-SCOUT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-DEBUGGER=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-ARCHITECT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh architect .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
+LEAD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh lead .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+DEV=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh dev .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+QA=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh qa .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+SCOUT=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+DEBUGGER=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+ARCHITECT=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh architect .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
 # Check for overrides and mark with asterisk
 LEAD_DISPLAY=$LEAD
 DEV_DISPLAY=$DEV
@@ -99,15 +99,15 @@ Store selection in variable `PROFILE_METHOD`.
 Calculate OLD_COST before making changes (cost weights: opus=100, sonnet=20, haiku=2):
 ```bash
 CURRENT_PROFILE=$(jq -r '.model_profile // "quality"' .vbw-planning/config.json)
-PROFILES_PATH="${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json"
+PROFILES_PATH="`!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json"
 
 # Get current models (before changes)
-LEAD_OLD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh lead .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-DEV_OLD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh dev .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-QA_OLD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh qa .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-SCOUT_OLD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-DEBUGGER_OLD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-ARCHITECT_OLD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh architect .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
+LEAD_OLD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh lead .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+DEV_OLD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh dev .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+QA_OLD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh qa .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+SCOUT_OLD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+DEBUGGER_OLD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+ARCHITECT_OLD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh architect .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
 
 # Calculate cost based on model
 get_model_cost() {
@@ -124,10 +124,10 @@ OLD_COST=$(( $(get_model_cost "$LEAD_OLD") + $(get_model_cost "$DEV_OLD") + $(ge
 
 Get current models for Lead, Dev, QA, Scout:
 ```bash
-CURRENT_LEAD=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh lead .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-CURRENT_DEV=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh dev .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-CURRENT_QA=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh qa .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-CURRENT_SCOUT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
+CURRENT_LEAD=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh lead .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+CURRENT_DEV=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh dev .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+CURRENT_QA=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh qa .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+CURRENT_SCOUT=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
 ```
 
 AskUserQuestion with 4 questions:
@@ -142,8 +142,8 @@ Store selections in variables `LEAD_MODEL`, `DEV_MODEL`, `QA_MODEL`, `SCOUT_MODE
 
 Get current models for Debugger and Architect:
 ```bash
-CURRENT_DEBUGGER=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-CURRENT_ARCHITECT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh architect .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
+CURRENT_DEBUGGER=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh debugger .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+CURRENT_ARCHITECT=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh architect .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
 ```
 
 AskUserQuestion with 2 questions:
@@ -215,7 +215,7 @@ fi
 - If mismatch: AskUserQuestion "Settings no longer match '{profile}'. Save as new profile?" → "Save" (route to /vbw:profile save) or "No" (set active_profile to "custom")
 - Skip if no profile-tracked settings changed or already "custom"
 
-Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh config` and display.
+Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh config` and display.
 
 ### With arguments: `<setting> <value>`
 
@@ -225,7 +225,7 @@ If `setting=planning_tracking`, after writing config run:
 
 ```bash
   PG_SCRIPT="$(ls -1 "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/vbw-marketplace/vbw/*/scripts/planning-git.sh 2>/dev/null | (sort -V 2>/dev/null || sort -t. -k1,1n -k2,2n -k3,3n) | tail -1)"
-  [ ! -f "$PG_SCRIPT" ] && PG_SCRIPT="${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/scripts/planning-git.sh}"
+  [ ! -f "$PG_SCRIPT" ] && PG_SCRIPT="`!`echo $CLAUDE_PLUGIN_ROOT`/scripts/planning-git.sh"
   if [ -f "$PG_SCRIPT" ]; then
     bash "$PG_SCRIPT" sync-ignore .vbw-planning/config.json
   else
@@ -252,7 +252,7 @@ Validates profile name (quality/balanced/budget), shows before/after cost estima
 
 ```bash
 PROFILE="$1"
-PROFILES_PATH="${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json"
+PROFILES_PATH="`!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json"
 
 # Validate profile
 if ! jq -e ".$PROFILE" "$PROFILES_PATH" >/dev/null 2>&1; then
@@ -321,7 +321,7 @@ case "$MODEL" in
 esac
 
 # Get current model for this agent
-OLD_MODEL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh "$AGENT" .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
+OLD_MODEL=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh "$AGENT" .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
 
 echo "Set $AGENT model override: $MODEL (was: $OLD_MODEL)"
 

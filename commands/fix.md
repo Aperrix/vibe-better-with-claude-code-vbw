@@ -24,8 +24,8 @@ Config: Pre-injected by SessionStart hook.
 
 3. **Spawn Dev:** Resolve model first:
     ```bash
-    DEV_MODEL=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-model.sh dev .vbw-planning/config.json ${CLAUDE_PLUGIN_ROOT}/config/model-profiles.json)
-    DEV_MAX_TURNS=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/resolve-agent-max-turns.sh dev .vbw-planning/config.json turbo)
+    DEV_MODEL=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-model.sh dev .vbw-planning/config.json `!`echo $CLAUDE_PLUGIN_ROOT`/config/model-profiles.json)
+    DEV_MAX_TURNS=$(bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/resolve-agent-max-turns.sh dev .vbw-planning/config.json turbo)
     ```
 
     Spawn vbw-dev as subagent via Task tool with `model: "${DEV_MODEL}"` and
@@ -50,7 +50,7 @@ Config: Pre-injected by SessionStart hook.
       Files: {changed files}
     ```
 
-    Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh fix` and display.
+    Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh fix` and display.
 
     Committed, with discovered issues (Dev reported pre-existing failures):
 
@@ -73,7 +73,7 @@ Config: Pre-injected by SessionStart hook.
     invoke /vbw:todo, and do NOT enter an interactive loop. The user decides
     whether to track these. If no discovered issues: omit the section entirely.
     After displaying discovered issues, STOP. Do not take further action.
-    Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh fix` and display.
+    Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh fix` and display.
 
     Dev stopped:
 
@@ -82,4 +82,4 @@ Config: Pre-injected by SessionStart hook.
       {reason from Dev agent}
     ```
 
-    Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh debug` and display.
+    Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh debug` and display.

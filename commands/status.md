@@ -96,4 +96,4 @@ Per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md:
     Cache hit rate: {percent}%
 ```
 
-**Next Up:** Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/suggest-next.sh status` and display.
+**Next Up:** Run `bash `!`echo $CLAUDE_PLUGIN_ROOT`/scripts/suggest-next.sh status` and display.
