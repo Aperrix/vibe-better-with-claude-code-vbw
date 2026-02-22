@@ -68,9 +68,11 @@ Write the initial `{phase}-UAT.md` in the phase directory using the `templates/U
 - Populate YAML frontmatter: phase, plan_count, status=in_progress, started=today, total_tests
 - Write all test entries with Result fields empty
 
-### 4. CHECKPOINT loop (one test at a time)
+### 4. CHECKPOINT loop (one test at a time — conversational, blocking)
 
-For each test without a result, display a CHECKPOINT block:
+**This is a conversational loop. Present ONE test, then STOP and wait for the user to respond. Do NOT present multiple tests at once. Do NOT skip ahead. Do NOT end the session after presenting a test.**
+
+For the FIRST test without a result, display a CHECKPOINT block:
 
 ```
 ┌─ CHECKPOINT {N}/{total} ──────────────────────┐
@@ -79,10 +81,14 @@ For each test without a result, display a CHECKPOINT block:
 │  {scenario description}                        │
 │                                                │
 │  Expected: {expected result}                   │
+│                                                │
+│  → Type "pass" or describe what's wrong        │
 └────────────────────────────────────────────────┘
 ```
 
-Wait for the user's response via natural conversation (do NOT use AskUserQuestion).
+**STOP HERE.** Wait for the user's plain text response. Do NOT use AskUserQuestion. Do NOT proceed to the next test. Do NOT summarize results. Just present the checkpoint and wait.
+
+**After the user responds:** Process their response (Step 5), persist the result (Step 7), then present the NEXT test using the same CHECKPOINT format above. Repeat until all tests are done, then go to Step 8.
 
 ### 5. Response mapping (string matching, not LLM)
 
