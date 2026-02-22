@@ -33,7 +33,6 @@ for vf in "${verif_files[@]}"; do
   total=""
   tier=""
   in_frontmatter=false
-  frontmatter_done=false
   fm_count=0
 
   while IFS= read -r line; do
@@ -44,7 +43,6 @@ for vf in "${verif_files[@]}"; do
         continue
       elif [[ $fm_count -eq 2 ]]; then
         in_frontmatter=false
-        frontmatter_done=true
         break
       fi
     fi
@@ -136,7 +134,7 @@ for vf in "${verif_files[@]}"; do
   # Print summary from frontmatter (works for both formats)
   if [[ -n "$result" && -n "$total" ]]; then
     echo ""
-    echo "  QA: $result (${passed:-0}/${total} passed${tier:+, tier: $tier})"
+    echo "  QA: $result (${passed:-0}/${total} passed${failed:+, ${failed} failed}${tier:+, tier: $tier})"
   else
     # Last resort: grep for Verdict line
     verdict=$(grep -i 'Verdict' "$vf" 2>/dev/null | sed 's/^#* *//; s/\*\*//g' | head -1)
