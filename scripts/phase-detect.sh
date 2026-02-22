@@ -186,7 +186,7 @@ if [ -d "$PHASES_DIR" ]; then
         continue
       fi
 
-      UAT_FILE=$(ls "$DIR"[0-9]*-UAT.md 2>/dev/null | sort | tail -1 || true)
+      UAT_FILE=$(ls "$DIR"[0-9]*-UAT.md 2>/dev/null | grep -v 'SOURCE-UAT' | sort | tail -1 || true)
       if [ -f "$UAT_FILE" ]; then
         UAT_STATUS=$(extract_status_value "$UAT_FILE")
         if [ "$UAT_STATUS" = "issues_found" ]; then
@@ -292,6 +292,25 @@ echo "uat_issues_phase=$UAT_ISSUES_PHASE"
 echo "uat_issues_slug=$UAT_ISSUES_SLUG"
 echo "uat_issues_major_or_higher=$UAT_ISSUES_MAJOR_OR_HIGHER"
 
+# --- Brownfield cross-reference: active remediation → milestone phases ---
+# Build a set of milestone phase paths already covered by active remediation
+# phases. This handles the case where create-remediation-phase.sh wasn't used
+# (or ran before. .remediated markers existed), so .remediated files are missing.
+REMEDIATED_MS_PATHS=""
+if [ -d "$PHASES_DIR" ] && [ ${#PHASE_DIRS[@]:-0} -gt 0 ]; then
+  for _rx_dir in ${PHASE_DIRS[@]+"${PHASE_DIRS[@]}"}; do
+    [ -d "$_rx_dir" ] || continue
+    _rx_ctx=$(ls "$_rx_dir"[0-9]*-CONTEXT.md 2>/dev/null | sort | head -1 || true)
+    [ -f "$_rx_ctx" ] || continue
+    _rx_src_ms=$(awk '/^source_milestone:/{gsub(/^source_milestone:[[:space:]]*/,""); gsub(/[[:space:]]*$/,""); print; exit}' "$_rx_ctx" 2>/dev/null || true)
+    _rx_src_ph=$(awk '/^source_phase:/{gsub(/^source_phase:[[:space:]]*/,""); gsub(/[[:space:]]*$/,""); print; exit}' "$_rx_ctx" 2>/dev/null || true)
+    if [ -n "$_rx_src_ms" ] && [ -n "$_rx_src_ph" ]; then
+      _rx_resolved="$PLANNING_DIR/milestones/$_rx_src_ms/phases/$_rx_src_ph"
+      REMEDIATED_MS_PATHS="${REMEDIATED_MS_PATHS:+${REMEDIATED_MS_PATHS}|}$_rx_resolved"
+    fi
+  done
+fi
+
 # --- Milestone UAT scanning (post-archive recovery) ---
 # When active phases have no work (all_done or no_phases) and no active UAT remediation,
 # scan archived milestones for unresolved UAT issues.
@@ -339,6 +358,12 @@ if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] ||
       # Skip phases already remediated (marker written by create-remediation-phase.sh)
       [ -f "${_ms_phase_dir}.remediated" ] && continue
 
+      # Skip phases covered by active remediation (brownfield: no .remediated marker)
+      _ms_phase_canonical="${_ms_phase_dir%/}"
+      if [ -n "$REMEDIATED_MS_PATHS" ] && echo "$REMEDIATED_MS_PATHS" | grep -qF "$_ms_phase_canonical"; then
+        continue
+      fi
+
       # Skip phases without execution artifacts
       _ms_plans=$(ls "$_ms_phase_dir"[0-9]*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
       _ms_summaries=$(ls "$_ms_phase_dir"[0-9]*-SUMMARY.md 2>/dev/null | wc -l | tr -d ' ')
@@ -346,7 +371,7 @@ if [ "$UAT_ISSUES_PHASE" = "none" ] && { [ "$NEXT_PHASE_STATE" = "all_done" ] ||
         continue
       fi
 
-      _ms_uat=$(ls "$_ms_phase_dir"[0-9]*-UAT.md 2>/dev/null | sort | tail -1 || true)
+      _ms_uat=$(ls "$_ms_phase_dir"[0-9]*-UAT.md 2>/dev/null | grep -v 'SOURCE-UAT' | sort | tail -1 || true)
       if [ -f "$_ms_uat" ]; then
         _ms_uat_status=$(extract_status_value "$_ms_uat")
         if [ "$_ms_uat_status" = "issues_found" ]; then
