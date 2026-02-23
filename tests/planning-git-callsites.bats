@@ -85,7 +85,7 @@ load test_helper
 }
 
 @test "all commands with readers have a preamble" {
-  for file in \"$PROJECT_ROOT/commands\"/*.md; do
+  for file in "$PROJECT_ROOT/commands"/*.md; do
     local reader_count
     reader_count=$(grep -c 'echo /tmp/.vbw-plugin-root-link-' "$file" 2>/dev/null || echo 0)
     if [ "$reader_count" -gt 0 ]; then
