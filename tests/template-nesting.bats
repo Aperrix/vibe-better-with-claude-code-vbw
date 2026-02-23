@@ -79,3 +79,14 @@ load test_helper
   count=$(grep -rc '!\`bash /tmp/.vbw-plugin-root-link-' "$PROJECT_ROOT/commands/" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
   [ "$count" -eq 10 ]
 }
+
+# ── UAT protocol safeguards ─────────────────────────────────────────────────
+# verify.md must explicitly ban automated test scenarios from UAT checkpoints.
+
+@test "verify.md bans automated test commands in UAT scenarios" {
+  grep -q 'NEVER generate tests that ask the user to run automated checks' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify.md lists automated test tools as excluded from UAT" {
+  grep -q 'xcodebuild test, pytest, bats, jest' "$PROJECT_ROOT/commands/verify.md"
+}

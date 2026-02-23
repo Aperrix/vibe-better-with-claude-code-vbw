@@ -65,10 +65,22 @@ Phase state:
 
 For each completed plan's SUMMARY.md:
 - Read what was built, files modified, and the plan's `must_haves`
-- Generate 1-3 test scenarios that require HUMAN verification (not automated checks)
+- Generate 1-3 test scenarios that require HUMAN judgment — things only a person can verify
 - Minimum 1 test per plan, even for pure refactors (use "verify nothing broke" regression test)
-- Tests should walk through real changes: run commands, check output, open files, verify behavior
 - Test IDs follow the format: `P{plan}-T{N}` (e.g., P01-T1, P01-T2, P02-T1)
+
+**UAT tests must be things only a human can judge.** Good examples:
+- Open the app and navigate to screen X — does it display Y correctly?
+- Perform user workflow A → B → C — does the result look right?
+- Check that the UI reflects the change — is the label/value/layout correct?
+
+**NEVER generate tests that ask the user to run automated checks.** These belong in the QA phase, not UAT:
+- ✗ Run a test suite or individual test (xcodebuild test, pytest, bats, jest, etc.)
+- ✗ Run a CLI command and check its exit code or output
+- ✗ Execute a script and verify it passes
+- ✗ Run a linter, type-checker, or build command
+
+If a plan only contains backend/test/script changes with no user-facing behavior, generate a scenario that asks the human to verify the *effect* is visible (e.g., "confirm the migration preview no longer shows phantom entries") rather than asking them to run the tests themselves.
 
 Write the initial `{phase}-UAT.md` in the phase directory using the `templates/UAT.md` format:
 - Populate YAML frontmatter: phase, plan_count, status=in_progress, started=today, total_tests
