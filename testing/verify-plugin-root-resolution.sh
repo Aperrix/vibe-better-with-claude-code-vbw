@@ -251,6 +251,18 @@ for file in "$COMMANDS_DIR"/*.md; do
   fi
 done
 
+# Check 8b: All command preambles link REAL_R not raw R (dynamic coverage)
+for file in "$COMMANDS_DIR"/*.md; do
+  base="$(basename "$file" .md)"
+  if grep -q 'LINK="/tmp/.vbw-plugin-root-link-' "$file"; then
+    if grep -q 'ln -s "$REAL_R"' "$file"; then
+      pass "$base: links REAL_R (canonical target)"
+    else
+      fail "$base: missing ln -s \"\$REAL_R\" — may link raw \$R through cache chain"
+    fi
+  fi
+done
+
 # Check 9: execute-protocol.md uses canonical pwd -P resolution with safe fallback
 if grep -q 'cd "$VBW_PLUGIN_ROOT" 2>/dev/null && pwd -P' "$EXECUTE_PROTOCOL"; then
   pass "execute-protocol uses canonical pwd -P resolution"
@@ -258,11 +270,13 @@ else
   fail "execute-protocol missing canonical pwd -P resolution"
 fi
 
-# Check 10: execute-protocol.md does NOT use || true (blanks variable on cd failure)
+# Check 10: execute-protocol.md preserves original value on cd failure
 if grep -q 'pwd -P) || true' "$EXECUTE_PROTOCOL"; then
   fail "execute-protocol uses || true fallback (blanks VBW_PLUGIN_ROOT on cd failure)"
+elif grep -q 'pwd -P || echo "\$VBW_PLUGIN_ROOT"' "$EXECUTE_PROTOCOL"; then
+  pass "execute-protocol preserves VBW_PLUGIN_ROOT on cd failure"
 else
-  pass "execute-protocol does not use unsafe || true fallback"
+  fail "execute-protocol missing safe fallback for canonicalization failure"
 fi
 
 echo ""
