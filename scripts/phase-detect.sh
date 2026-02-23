@@ -77,6 +77,8 @@ else
   echo "uat_issues_phase=none"
   echo "uat_issues_slug=none"
   echo "uat_issues_major_or_higher=false"
+  echo "uat_issues_phases="
+  echo "uat_issues_count=0"
   echo "has_shipped_milestones=false"
   echo "needs_milestone_rename=false"
   echo "milestone_uat_issues=false"
@@ -179,6 +181,8 @@ NEXT_PHASE_SUMMARIES=0
 UAT_ISSUES_PHASE="none"
 UAT_ISSUES_SLUG="none"
 UAT_ISSUES_MAJOR_OR_HIGHER=false
+UAT_ISSUES_PHASES=""
+UAT_ISSUES_COUNT=0
 
 if [ -d "$PHASES_DIR" ]; then
   # Collect phase directories in numeric order (prevents 100 sorting before 11)
@@ -225,8 +229,15 @@ if [ -d "$PHASES_DIR" ]; then
       if [ -f "$UAT_FILE" ]; then
         UAT_STATUS=$(extract_status_value "$UAT_FILE")
         if [ "$UAT_STATUS" = "issues_found" ]; then
-          UAT_ISSUES_PHASE="$NUM"
-          UAT_ISSUES_SLUG="$DIRNAME"
+          # First match becomes the priority routing target
+          if [ "$UAT_ISSUES_PHASE" = "none" ]; then
+            UAT_ISSUES_PHASE="$NUM"
+            UAT_ISSUES_SLUG="$DIRNAME"
+          fi
+
+          # Accumulate all phases with issues
+          UAT_ISSUES_COUNT=$((UAT_ISSUES_COUNT + 1))
+          UAT_ISSUES_PHASES="${UAT_ISSUES_PHASES:+${UAT_ISSUES_PHASES},}$NUM"
 
           UAT_CRITICAL=$(grep -Eci 'severity:\**[[:space:]]*\**[[:space:]]*critical' "$UAT_FILE" || true)
           UAT_MAJOR=$(grep -Eci 'severity:\**[[:space:]]*\**[[:space:]]*major' "$UAT_FILE" || true)
@@ -237,7 +248,6 @@ if [ -d "$PHASES_DIR" ]; then
           if [ "$UAT_CRITICAL" -gt 0 ] || [ "$UAT_MAJOR" -gt 0 ] || [ "$UAT_TAGGED" -eq 0 ]; then
             UAT_ISSUES_MAJOR_OR_HIGHER=true
           fi
-          break
         fi
       fi
     done
@@ -349,6 +359,8 @@ echo "has_unverified_phases=$HAS_UNVERIFIED_PHASES"
 echo "uat_issues_phase=$UAT_ISSUES_PHASE"
 echo "uat_issues_slug=$UAT_ISSUES_SLUG"
 echo "uat_issues_major_or_higher=$UAT_ISSUES_MAJOR_OR_HIGHER"
+echo "uat_issues_phases=$UAT_ISSUES_PHASES"
+echo "uat_issues_count=$UAT_ISSUES_COUNT"
 
 # --- Brownfield cross-reference: active remediation → milestone phases ---
 # Build a set of milestone phase paths already covered by active remediation

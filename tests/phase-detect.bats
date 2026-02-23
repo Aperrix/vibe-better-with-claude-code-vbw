@@ -647,3 +647,81 @@ EOF
   echo "$output" | grep -q "milestone_uat_issues=true"
   echo "$output" | grep -q "milestone_uat_slug=v1"
 }
+
+@test "multiple phases with UAT issues are all reported in uat_issues_phases" {
+  mkdir -p .vbw-planning/phases/01-first/
+  touch .vbw-planning/phases/01-first/01-01-PLAN.md
+  touch .vbw-planning/phases/01-first/01-01-SUMMARY.md
+  cat > .vbw-planning/phases/01-first/01-UAT.md <<'EOF'
+---
+status: complete
+---
+All tests passed.
+EOF
+
+  mkdir -p .vbw-planning/phases/02-second/
+  touch .vbw-planning/phases/02-second/02-01-PLAN.md
+  touch .vbw-planning/phases/02-second/02-01-SUMMARY.md
+  cat > .vbw-planning/phases/02-second/02-UAT.md <<'EOF'
+---
+status: issues_found
+---
+- Severity: major
+EOF
+
+  mkdir -p .vbw-planning/phases/03-third/
+  touch .vbw-planning/phases/03-third/03-01-PLAN.md
+  touch .vbw-planning/phases/03-third/03-01-SUMMARY.md
+  cat > .vbw-planning/phases/03-third/03-UAT.md <<'EOF'
+---
+status: issues_found
+---
+- Severity: major
+EOF
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  # First phase with issues is the routing target
+  echo "$output" | grep -q "uat_issues_phase=02"
+  echo "$output" | grep -q "next_phase=02"
+  echo "$output" | grep -q "next_phase_state=needs_uat_remediation"
+  # All phases with issues are listed
+  echo "$output" | grep -q "uat_issues_phases=02,03"
+  echo "$output" | grep -q "uat_issues_count=2"
+}
+
+@test "single phase with UAT issues reports count=1 and phases list" {
+  mkdir -p .vbw-planning/phases/01-only/
+  touch .vbw-planning/phases/01-only/01-01-PLAN.md
+  touch .vbw-planning/phases/01-only/01-01-SUMMARY.md
+  cat > .vbw-planning/phases/01-only/01-UAT.md <<'EOF'
+---
+status: issues_found
+---
+- Severity: minor
+EOF
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "uat_issues_phase=01"
+  echo "$output" | grep -q "uat_issues_phases=01"
+  echo "$output" | grep -q "uat_issues_count=1"
+}
+
+@test "no UAT issues reports empty phases list and count=0" {
+  mkdir -p .vbw-planning/phases/01-clean/
+  touch .vbw-planning/phases/01-clean/01-01-PLAN.md
+  touch .vbw-planning/phases/01-clean/01-01-SUMMARY.md
+  cat > .vbw-planning/phases/01-clean/01-UAT.md <<'EOF'
+---
+status: complete
+---
+All tests passed.
+EOF
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "uat_issues_phase=none"
+  echo "$output" | grep -q "uat_issues_phases=$"
+  echo "$output" | grep -q "uat_issues_count=0"
+}
