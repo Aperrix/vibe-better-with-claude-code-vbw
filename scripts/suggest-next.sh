@@ -64,6 +64,7 @@ milestone_uat_slug="none"
 milestone_uat_count=0
 current_uat_issues_phase=""
 current_uat_issues_slug=""
+current_uat_issues_label=""
 current_uat_major_or_higher=false
 cfg_require_phase_discussion=false
 next_undiscussed=""
@@ -136,6 +137,15 @@ if [ -d "$PLANNING_DIR" ]; then
       current_uat_issues_phase="$_pd_uat_phase"
       current_uat_issues_slug="${_pd_uat_slug:-}"
       [ "${_pd_uat_major:-}" = "true" ] && current_uat_major_or_higher=true
+    fi
+
+    # Build human-readable phase label: "Phase N (slug-name)" or just "Phase N"
+    if [ -n "$current_uat_issues_phase" ] && [ -n "$current_uat_issues_slug" ]; then
+      current_uat_issues_label="Phase $current_uat_issues_phase ($current_uat_issues_slug)"
+    elif [ -n "$current_uat_issues_phase" ]; then
+      current_uat_issues_label="Phase $current_uat_issues_phase"
+    else
+      current_uat_issues_label=""
     fi
   fi
 
@@ -461,9 +471,9 @@ case "$CMD" in
           fi
         elif [ -n "$current_uat_issues_phase" ]; then
           if [ "$current_uat_major_or_higher" = true ]; then
-            suggest "/vbw:vibe -- Remediate UAT issues for Phase $current_uat_issues_phase"
+            suggest "/vbw:vibe -- Remediate UAT issues for $current_uat_issues_label"
           else
-            suggest "/vbw:fix -- Fix minor UAT issues in Phase $current_uat_issues_phase"
+            suggest "/vbw:fix -- Fix minor UAT issues in $current_uat_issues_label"
           fi
         elif [ -n "$next_unbuilt" ] || [ -n "$next_unplanned" ]; then
           target="${next_unbuilt:-$next_unplanned}"
@@ -528,9 +538,9 @@ case "$CMD" in
           fi
         elif [ -n "$current_uat_issues_phase" ]; then
           if [ "$current_uat_major_or_higher" = true ]; then
-            suggest "/vbw:vibe -- Remediate UAT issues for Phase $current_uat_issues_phase"
+            suggest "/vbw:vibe -- Remediate UAT issues for $current_uat_issues_label"
           else
-            suggest "/vbw:fix -- Fix minor UAT issues in Phase $current_uat_issues_phase"
+            suggest "/vbw:fix -- Fix minor UAT issues in $current_uat_issues_label"
           fi
         else
           target="${next_unbuilt:-$next_unplanned}"
@@ -647,9 +657,9 @@ case "$CMD" in
       fi
     elif [ -n "$current_uat_issues_phase" ]; then
       if [ "$current_uat_major_or_higher" = true ]; then
-        suggest "/vbw:vibe -- Remediate UAT issues for Phase $current_uat_issues_phase"
+        suggest "/vbw:vibe -- Remediate UAT issues for $current_uat_issues_label"
       else
-        suggest "/vbw:fix -- Fix minor UAT issues in Phase $current_uat_issues_phase"
+        suggest "/vbw:fix -- Fix minor UAT issues in $current_uat_issues_label"
       fi
     elif [ -n "$next_unbuilt" ] || [ -n "$next_unplanned" ]; then
       target="${next_unbuilt:-$next_unplanned}"
@@ -695,9 +705,9 @@ case "$CMD" in
   resume)
     if [ -n "$current_uat_issues_phase" ]; then
       if [ "$current_uat_major_or_higher" = true ]; then
-        suggest "/vbw:vibe -- Remediate UAT issues for Phase $current_uat_issues_phase"
+        suggest "/vbw:vibe -- Remediate UAT issues for $current_uat_issues_label"
       else
-        suggest "/vbw:fix -- Fix minor UAT issues in Phase $current_uat_issues_phase"
+        suggest "/vbw:fix -- Fix minor UAT issues in $current_uat_issues_label"
       fi
     elif [ "$all_done" = true ]; then
       if ! suggest_milestone_recovery; then

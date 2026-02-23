@@ -16,8 +16,7 @@ if [ -z "$input" ]; then
   exit 0
 fi
 
-normalized=$(printf '%s' "$input" |
-  tr '[:upper:]' '[:lower:]' |
+normalized=$(printf '%s' "$input" |  tr '\n' ' ' |  tr '[:upper:]' '[:lower:]' |
   sed -E "s/[’‘]/'/g; s/[–—]/-/g; s/[[:space:]]+/ /g; s/^ //; s/ $//")
 
 skip_re='(^|[^[:alnum:]_])(skip|skipped|next|n/a|na|later|defer)([^[:alnum:]_]|$)'

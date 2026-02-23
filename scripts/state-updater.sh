@@ -149,7 +149,7 @@ update_roadmap() {
     sed "s/^- \[ \] Phase ${phase_num}:/- [x] Phase ${phase_num}:/" "$tmp" > "$tmp2" 2>/dev/null && \
       mv "$tmp2" "$tmp" 2>/dev/null || rm -f "$tmp2" 2>/dev/null
   elif [ "$status" = "uat issues" ]; then
-    sed "s/^- \[x\] Phase ${phase_num}:/- [ ] Phase ${phase_num}:/" "$tmp" > "$tmp2" 2>/dev/null && \
+    sed "s/^- \[[xX]\] Phase ${phase_num}:/- [ ] Phase ${phase_num}:/" "$tmp" > "$tmp2" 2>/dev/null && \
       mv "$tmp2" "$tmp" 2>/dev/null || rm -f "$tmp2" 2>/dev/null
   fi
 
@@ -208,14 +208,15 @@ advance_phase() {
   [ "$plan_count" -gt 0 ] && [ "$summary_count" -eq "$plan_count" ] || return 0
 
   # Scan all phase dirs to find next incomplete
-  local phases_dir total next_num next_name all_done
+  local phases_dir total next_num next_name next_has_uat all_done
   phases_dir=$(dirname "$phase_dir")
   total=$(ls -d "$phases_dir"/*/ 2>/dev/null | wc -l | tr -d ' ')
   next_num=""
   next_name=""
+  next_has_uat=false
   all_done=true
 
-  for dir in $(ls -d "$phases_dir"/*/ 2>/dev/null | sort); do
+  for dir in $(ls -d "$phases_dir"/*/ 2>/dev/null | sort -V); do
     local dirname p s
     dirname=$(basename "$dir")
     p=$(ls -1 "$dir"*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')
@@ -236,6 +237,7 @@ advance_phase() {
         next_num=$(echo "$dirname" | sed 's/^\([0-9]*\).*/\1/' | sed 's/^0*//')
         [ -z "$next_num" ] && next_num=0
         next_name=$(slug_to_name "$dirname")
+        next_has_uat=true
       fi
       all_done=false
       break
@@ -249,8 +251,10 @@ advance_phase() {
     sed "s/^Status: .*/Status: complete/" "$state_md" > "$tmp" 2>/dev/null && \
       mv "$tmp" "$state_md" 2>/dev/null || rm -f "$tmp" 2>/dev/null
   elif [ -n "$next_num" ]; then
+    local next_status="ready"
+    [ "$next_has_uat" = true ] && next_status="needs_remediation"
     sed "s/^Phase: .*/Phase: ${next_num} of ${total} (${next_name})/" "$state_md" | \
-      sed "s/^Status: .*/Status: ready/" > "$tmp" 2>/dev/null && \
+      sed "s/^Status: .*/Status: ${next_status}/" > "$tmp" 2>/dev/null && \
       mv "$tmp" "$state_md" 2>/dev/null || rm -f "$tmp" 2>/dev/null
   fi
 }
@@ -272,7 +276,7 @@ if echo "$FILE_PATH" | grep -qE 'phases/[^/]+/[0-9]+(-[0-9]+)?-PLAN\.md$'; then
 fi
 
 # UAT.md trigger: update roadmap + state when UAT results are written
-if echo "$FILE_PATH" | grep -qE 'phases/[^/]+/[0-9]+-UAT\.md$'; then
+if echo "$FILE_PATH" | grep -qE 'phases/[^/]+/[0-9]+(-[0-9]+)?-UAT\.md$'; then
   [ -f "$FILE_PATH" ] || exit 0
   update_roadmap "$(dirname "$FILE_PATH")"
   advance_phase "$(dirname "$FILE_PATH")"

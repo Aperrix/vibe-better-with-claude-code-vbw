@@ -665,3 +665,22 @@ load test_helper
   grep -qi 'Idiomatic-positive exceptions' "$PROJECT_ROOT/commands/verify.md"
   grep -qi 'Observation extraction guard' "$PROJECT_ROOT/commands/verify.md"
 }
+
+# =============================================================================
+# QA round 4 (PR #142): newline-separated input via stdin
+# =============================================================================
+
+@test "verify response mapping handles newline between pass and issue observation via stdin" {
+  result=$(printf 'pass\nbut the sidebar is broken' | bash "$PROJECT_ROOT/scripts/map-verify-response.sh")
+  [ "$result" = "pass_with_observation" ]
+}
+
+@test "verify response mapping handles newline between skip and issue observation via stdin" {
+  result=$(printf 'skip\nbut there is a bug' | bash "$PROJECT_ROOT/scripts/map-verify-response.sh")
+  [ "$result" = "skip_with_observation" ]
+}
+
+@test "verify response mapping handles newline-only pass via stdin" {
+  result=$(printf 'looks good\nno issues' | bash "$PROJECT_ROOT/scripts/map-verify-response.sh")
+  [ "$result" = "pass" ]
+}
