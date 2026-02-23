@@ -23,7 +23,16 @@ issues: {N}
 - **Issue:** {if result=issue}
   - Description: {issue-description}
   - Severity: {critical|major|minor}
-  - Fix: /vbw:fix "{suggested-fix-description}"
+
+### D{N}: {discovered-issue-title}
+
+- **Plan:** (discovered during {test-id})
+- **Scenario:** User observation during UAT
+- **Expected:** (not applicable — discovered issue)
+- **Result:** issue
+- **Issue:**
+  - Description: {observation text}
+  - Severity: {critical|major|minor}
 
 ## Summary
 

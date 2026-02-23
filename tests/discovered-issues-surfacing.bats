@@ -429,8 +429,8 @@ load test_helper
 # Verify command: discovered issues scoped to user-reported
 # =============================================================================
 
-@test "verify command discovered issues scoped to user-reported issues" {
-  grep -A2 'Discovered Issues' "$PROJECT_ROOT/commands/verify.md" | grep -qi 'user.*reported'
+@test "verify command discovered issues flow into remediation" {
+  grep -qi 'flow into remediation' "$PROJECT_ROOT/commands/verify.md"
 }
 
 # =============================================================================
@@ -445,12 +445,12 @@ load test_helper
   grep -q '⚠' "$PROJECT_ROOT/commands/verify.md"
 }
 
-@test "verify command discovered issues suggests /vbw:todo" {
-  grep -q '/vbw:todo' "$PROJECT_ROOT/commands/verify.md"
+@test "verify command discovered issues recorded in UAT.md" {
+  grep -qi 'recorded in the UAT.md' "$PROJECT_ROOT/commands/verify.md"
 }
 
-@test "verify command discovered issues is display-only" {
-  grep -q 'display-only' "$PROJECT_ROOT/commands/verify.md"
+@test "verify command discovered issues uses D{N} IDs" {
+  grep -q 'D{N}' "$PROJECT_ROOT/commands/verify.md"
 }
 
 # =============================================================================
@@ -463,7 +463,8 @@ load test_helper
 
 @test "all discovered issues sections use display-only constraint" {
   local failed=""
-  for file in commands/fix.md commands/debug.md commands/qa.md commands/verify.md references/execute-protocol.md; do
+  # verify.md is excluded — its discovered issues flow into remediation via UAT.md, not display-only
+  for file in commands/fix.md commands/debug.md commands/qa.md references/execute-protocol.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -q 'display-only' "$PROJECT_ROOT/$file"; then
         failed="${failed} ${file}"
@@ -475,7 +476,8 @@ load test_helper
 
 @test "all discovered issues sections suggest /vbw:todo" {
   local failed=""
-  for file in commands/fix.md commands/debug.md commands/qa.md commands/verify.md references/execute-protocol.md; do
+  # verify.md is excluded — its discovered issues flow into remediation via UAT.md
+  for file in commands/fix.md commands/debug.md commands/qa.md references/execute-protocol.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -q '/vbw:todo' "$PROJECT_ROOT/$file"; then
         failed="${failed} ${file}"
@@ -499,7 +501,8 @@ load test_helper
 
 @test "all discovered issues sections specify testName format" {
   local failed=""
-  for file in commands/fix.md commands/debug.md commands/qa.md commands/verify.md references/execute-protocol.md; do
+  # verify.md is excluded — uses D{N} format for UAT remediation, not testName format
+  for file in commands/fix.md commands/debug.md commands/qa.md references/execute-protocol.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -q 'testName.*path/to/file.*error' "$PROJECT_ROOT/$file"; then
         failed="${failed} ${file}"
@@ -515,7 +518,8 @@ load test_helper
 
 @test "all discovered issues sections include STOP after display" {
   local failed=""
-  for file in commands/fix.md commands/debug.md commands/qa.md commands/verify.md; do
+  # verify.md is excluded — its discovered issues flow into remediation, no STOP needed
+  for file in commands/fix.md commands/debug.md commands/qa.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -qi 'STOP.*Do not take further action' "$PROJECT_ROOT/$file"; then
         failed="${failed} ${file}"
@@ -543,7 +547,8 @@ load test_helper
 
 @test "all discovered issues sections have de-duplication instruction" {
   local failed=""
-  for file in commands/fix.md commands/debug.md commands/qa.md commands/verify.md references/execute-protocol.md; do
+  # verify.md is excluded — uses D{N} sequential IDs, dedup not applicable
+  for file in commands/fix.md commands/debug.md commands/qa.md references/execute-protocol.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -qi 'de-duplicate\|De-duplicate' "$PROJECT_ROOT/$file"; then
         failed="${failed} ${file}"
@@ -555,7 +560,8 @@ load test_helper
 
 @test "all discovered issues sections have cap at 20" {
   local failed=""
-  for file in commands/fix.md commands/debug.md commands/qa.md commands/verify.md references/execute-protocol.md; do
+  # verify.md is excluded — UAT test count is naturally bounded by generated tests
+  for file in commands/fix.md commands/debug.md commands/qa.md references/execute-protocol.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -qi 'cap.*20\|Cap.*20' "$PROJECT_ROOT/$file"; then
         failed="${failed} ${file}"
@@ -565,12 +571,12 @@ load test_helper
   [ -z "$failed" ] || { echo "Missing cap at 20 in:$failed"; return 1; }
 }
 
-@test "verify command has best-effort extraction guidance" {
-  grep -qi 'best-effort' "$PROJECT_ROOT/commands/verify.md"
+@test "verify command freeform handles pass-intent with observation" {
+  grep -qi 'pass-intent.*observation\|pass-intent with observation' "$PROJECT_ROOT/commands/verify.md"
 }
 
-@test "verify command handles unknown test name or file" {
-  grep -qi 'unknown' "$PROJECT_ROOT/commands/verify.md"
+@test "verify command freeform lists pass-intent words" {
+  grep -qi 'pass, passed, looks good, works' "$PROJECT_ROOT/commands/verify.md"
 }
 
 @test "dev agent DEVN-05 has priority rule for overlapping uncertainty" {

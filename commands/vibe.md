@@ -238,7 +238,7 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 **Steps:**
 1. Resolve target phase from pre-computed state (`next_phase`, `next_phase_slug`) when `next_phase_state=needs_uat_remediation`. Set `PHASE_DIR` to the resolved phase directory path.
    **Milestone path guard (NON-NEGOTIABLE):** If `PHASE_DIR` contains `.vbw-planning/milestones/` (e.g., `.vbw-planning/milestones/*/phases/`), STOP — this is an archived milestone. UAT Remediation operates only on active phases in `.vbw-planning/phases/`. Display: "⚠ UAT issues found in archived milestone, not active phases. Routing to Milestone UAT Recovery." Then route to Milestone UAT Recovery mode instead.
-2. Read latest `{phase}-UAT.md` in the target phase directory. Extract all issues (`Pxx-Ty` entries) with description and severity.
+2. Read latest `{phase}-UAT.md` in the target phase directory. Extract all issues — both test failures (`Pxx-Ty` entries) and discovered issues (`D{N}` entries) — with description and severity.
 3. Treat the UAT report as source-of-truth scope. Do NOT ask the user to restate issues already recorded in UAT.
 4. **Read or initialize remediation stage:**
    ```bash

@@ -121,13 +121,15 @@ After response: process (Step 5), persist (Step 7), then present the NEXT test. 
 
 Map the AskUserQuestion response:
 
-**"Pass" selected:** Record as passed.
+**"Pass" selected:** Record as passed. **However**, if the user's response also mentions a separate bug/issue (e.g., "Pass, but I noticed X is broken"), record the test as passed AND capture the separate observation as a discovered issue (see Step 6a).
 
 **"Skip" selected:** Record as skipped.
 
-**Freeform text (via "Other"):** Apply case-insensitive, trimmed string matching:
+**Freeform text (via "Other"):** Apply case-insensitive, trimmed matching in this order:
 - **Skip words:** skip, skipped, next, n/a, na, later, defer → record as skipped
-- **Anything else:** treat the entire response text as an issue description.
+- **Pass-intent with observation:** If the text starts with or contains a pass-intent word (pass, passed, looks good, works, correct, confirmed, yes, good, fine, ok) AND also contains additional text describing a bug, issue, or observation after a separator (but, however, also, although, though, comma, semicolon, period, dash), then: record the test as **passed** AND capture the observation text as a discovered issue (see Step 6a). Example: "pass, but I noticed the stats section still shows for positions with no covered calls" → test passes, discovered issue created.
+- **Pass-intent only:** If the text is just a pass-intent word with no issue observation → record as passed.
+- **Anything else:** treat the entire response text as an issue description (go to Step 6).
 
 ### 6. Issue handling (when response = issue)
 
@@ -145,6 +147,37 @@ Record: description, inferred severity.
 Display:
 ```text
 Issue recorded (severity: {level}). Final next-step routing shown at UAT summary.
+```
+
+### 6a. Discovered issue handling (observations during passing/skipping tests)
+
+When a user passes or skips a test but also mentions a separate bug, issue, or observation unrelated to the test's expected behavior, capture it as a **discovered issue**.
+
+Assign a discovered-issue ID: `D{N}` (D01, D02, ...) — sequential across the UAT session.
+
+Infer severity using the same keyword table from Step 6. Infer category from context:
+- If the user identifies a specific view/screen/component: use that as the description prefix
+- If vague: use the verbatim observation
+
+Append a new test entry to the UAT.md `## Tests` section:
+
+```markdown
+### D{N}: {short-title}
+
+- **Plan:** (discovered during {test-id})
+- **Scenario:** User observation during UAT
+- **Expected:** (not applicable — discovered issue)
+- **Result:** issue
+- **Issue:**
+  - Description: {observation text}
+  - Severity: {inferred severity}
+```
+
+Increment `total_tests` and `issues` in frontmatter. This ensures discovered issues flow into UAT remediation alongside test failures.
+
+Display:
+```text
+Discovered issue D{N} recorded (severity: {level}).
 ```
 
 ### 7. After each response: persist immediately
@@ -171,14 +204,13 @@ Issue recorded (severity: {level}). Final next-step routing shown at UAT summary
   Report:   {path to UAT.md}
 ```
 
-**Discovered Issues:** If the user reported failures or bugs during CHECKPOINT responses that are clearly unrelated to this phase's work (e.g., "this other test was already broken"), extract structured fields on a best-effort basis: use the test name if mentioned (or infer from context), the file path if identifiable, and the error text as reported. If the user's description is too vague to extract a test name or file, use the description verbatim as the error field and mark test/file as "unknown". De-duplicate by test name and file. Cap the list at 20 entries; if more exist, show the first 20 and append `... and {N} more`. Append after the result box:
+**Discovered Issues in summary:** If any discovered issues (`D{N}` entries) were recorded during the session, list them after the result box so the user sees them at a glance:
 ```text
   Discovered Issues:
-    ⚠ testName (path/to/file): error message
-    ⚠ testName (path/to/file): error message
-  Suggest: /vbw:todo <description> to track
+    ⚠ D01: {short-title} (severity: {level})
+    ⚠ D02: {short-title} (severity: {level})
 ```
-This is **display-only**. Do NOT edit STATE.md, do NOT add todos, do NOT invoke /vbw:todo, and do NOT enter an interactive loop. The user decides whether to track these. If no discovered issues: omit the section entirely. After displaying discovered issues, STOP. Do not take further action.
+These are already recorded in the UAT.md and will flow into remediation alongside test failures. If no discovered issues: omit the section.
 
 - If issues found:
   - Any issue severity is `critical` or `major`:
