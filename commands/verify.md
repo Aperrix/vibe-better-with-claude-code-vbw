@@ -123,13 +123,21 @@ Map the AskUserQuestion response:
 
 **"Pass" selected:** Record as passed. **However**, if the user's response also mentions a separate bug/issue (e.g., "Pass, but I noticed X is broken"), record the test as passed AND capture the separate observation as a discovered issue (see Step 6a).
 
-**"Skip" selected:** Record as skipped. **However**, if the user's response also mentions a separate bug/issue (e.g., "Skip, but the sidebar is broken"), record the test as skipped AND capture the observation as a discovered issue (see Step 6a).
+**"Skip" selected:** Record as skipped. **However**, if the user selected "Skip" but also typed additional text describing a bug/issue (e.g., the response body contains "but the sidebar is broken" alongside the Skip selection), record the test as skipped AND capture the additional text as a discovered issue (see Step 6a). The additional text is the response content beyond the option selection itself.
 
-**Freeform text (via "Other"):** Apply case-insensitive, trimmed matching in this order. Match pass/skip-intent as **whole words only** (e.g., "pass" matches but "passport" does not; "works" matches but "worksmanship" does not):
-- **Skip-intent with observation:** If the text starts with or contains a skip-intent word (skip, skipped, next, n/a, na, later, defer) as a whole word AND also contains additional text describing a bug, issue, or observation after a separator (but, however, also, although, though, comma, semicolon, period, dash), then: record the test as **skipped** AND capture the observation text as a discovered issue (see Step 6a). Example: "skip, but the sidebar is completely broken" → test skipped, discovered issue created.
+**Freeform text (via "Other"):** Apply case-insensitive, trimmed matching in this order.
+
+**Word-boundary rule:** Match intent keywords as whole words only — a keyword matches when it is surrounded by whitespace, punctuation, or string boundaries (equivalent to regex `\b`). Examples: "pass" matches in "pass, but..." and "Pass." but NOT in "passport"; "works" matches in "it works" but NOT in "worksmanship"; "good" matches in "looks good" but NOT in "goodness".
+
+**Negation guard:** Before classifying as pass-intent, check whether the pass-intent word is immediately preceded by a negation word (not, don't, doesn't, didn't, isn't, wasn't, no, never, neither, nor, hardly, barely, cannot, can't, won't, wouldn't, shouldn't). If a negation precedes the pass-intent word within the same clause, treat the entire response as an issue (go to Step 6). Examples: "not good, still broken" → issue (not a pass); "doesn't work at all" → issue; "it works" → pass.
+
+**Dual-intent tie-break:** If a response contains BOTH skip-intent and pass-intent words (e.g., "pass — I'll skip checking the edge case"), resolve by the **first intent word found** reading left-to-right. If both appear in the same position (impossible in practice), prefer skip-intent. This ordering matches the evaluation order below.
+
+Evaluate in this order:
+- **Skip-intent with observation:** If the text starts with or contains a skip-intent word (skip, skipped, next, n/a, na, later, defer) as a whole word AND also contains additional text describing a bug, issue, or observation after a separator (but, however, also, although, though, comma, semicolon, period, dash, colon, em dash, newline), then: record the test as **skipped** AND capture the observation text (everything after the separator) as a discovered issue (see Step 6a). Example: "skip, but the sidebar is completely broken" → test skipped, discovered issue created.
 - **Skip-intent only:** If the text is just a skip-intent word with no issue observation → record as skipped.
-- **Pass-intent with observation:** If the text starts with or contains a pass-intent word (pass, passed, looks good, works, correct, confirmed, yes, good, fine, ok) as a whole word AND also contains additional text describing a bug, issue, or observation after a separator (but, however, also, although, though, comma, semicolon, period, dash), then: record the test as **passed** AND capture the observation text as a discovered issue (see Step 6a). Example: "pass, but I noticed the stats section still shows for positions with no covered calls" → test passes, discovered issue created.
-- **Pass-intent only:** If the text is just a pass-intent word with no issue observation → record as passed.
+- **Pass-intent with observation:** If the text starts with or contains a pass-intent word (pass, passed, looks good, works, correct, confirmed, yes, good, fine, ok) as a whole word (and not negated — see negation guard above) AND also contains additional text describing a bug, issue, or observation after a separator (but, however, also, although, though, comma, semicolon, period, dash, colon, em dash, newline), then: record the test as **passed** AND capture the observation text (everything after the separator) as a discovered issue (see Step 6a). Example: "pass, but I noticed the stats section still shows for positions with no covered calls" → test passes, discovered issue created.
+- **Pass-intent only:** If the text is just a pass-intent word (not negated) with no issue observation → record as passed.
 - **Anything else:** treat the entire response text as an issue description (go to Step 6).
 
 ### 6. Issue handling (when response = issue)

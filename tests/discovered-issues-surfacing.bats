@@ -608,3 +608,57 @@ load test_helper
   # Should not contain "same structure as defined in execution_update" (circular)
   ! sed -n '/## Communication/,/^##/p' "$PROJECT_ROOT/agents/vbw-dev.md" | grep -q 'same.*structure as defined in.*execution_update'
 }
+
+# =============================================================================
+# QA round 2 (PR #142): negation guard, word-boundary, tie-break, response shape
+# =============================================================================
+
+@test "verify command freeform has negation guard" {
+  grep -qi 'negation guard' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify command negation guard lists negation words" {
+  # Must list at least the core negation words
+  for word in "not" "don't" "doesn't" "didn't" "isn't" "never" "cannot" "can't"; do
+    grep -qi "$word" "$PROJECT_ROOT/commands/verify.md" || { echo "Missing negation word: $word"; return 1; }
+  done
+}
+
+@test "verify command negation guard gives examples" {
+  # Must have at least one example showing negation -> issue
+  grep -qi 'not good.*issue\|not good.*not a pass' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify command has dual-intent tie-break rule" {
+  grep -qi 'dual-intent tie-break\|tie-break' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify command tie-break resolves by first intent word" {
+  grep -qi 'first intent word' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify command word-boundary rule has regex equivalent" {
+  # Must reference \b or equivalent
+  grep -q '\\b' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify command word-boundary rule gives positive and negative examples" {
+  # Must show both matching and non-matching examples
+  grep -qi 'passport' "$PROJECT_ROOT/commands/verify.md"
+  grep -qi 'worksmanship' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify command freeform separators include colon and em dash" {
+  # QA finding: separator list should include colon and em dash
+  grep -qi 'colon.*em dash\|em dash.*colon' "$PROJECT_ROOT/commands/verify.md"
+}
+
+@test "verify command skip button response shape clarifies additional text" {
+  # Step 5 Skip path must specify where observation text appears
+  sed -n '/\*\*"Skip" selected:\*\*/,/\*\*Freeform/p' "$PROJECT_ROOT/commands/verify.md" | grep -qi 'additional text\|response content\|response body'
+}
+
+@test "verify command pass-intent with observation captures text after separator" {
+  # Must specify what gets captured as the discovered issue
+  grep -qi 'everything after the separator\|observation text.*after' "$PROJECT_ROOT/commands/verify.md"
+}
