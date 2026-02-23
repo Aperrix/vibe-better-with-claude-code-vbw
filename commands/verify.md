@@ -111,6 +111,8 @@ multiSelect: false
 options:
   - label: "Pass"
     description: "Behavior matches expected result"
+  - label: "Skip"
+    description: "Cannot test right now — skip this checkpoint"
 ```
 
 The tool automatically provides a freeform "Other" option for the user to describe issues.
@@ -122,6 +124,8 @@ After response: process (Step 5), persist (Step 7), then present the NEXT test. 
 Map the AskUserQuestion response:
 
 **"Pass" selected:** Record as passed.
+
+**"Skip" selected:** Record as skipped.
 
 **Freeform text (via "Other"):** Apply case-insensitive, trimmed string matching:
 - **Skip words:** skip, skipped, next, n/a, na, later, defer → record as skipped
