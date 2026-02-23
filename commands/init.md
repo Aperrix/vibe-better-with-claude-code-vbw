@@ -33,7 +33,7 @@ Project files:
 ```
 Skills:
 ```
-!`ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/" 2>/dev/null || echo "No global skills"`
+!`for _d in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.config/claude-code" "$HOME/.claude"; do [ -z "$_d" ] && continue; [ -d "$_d/skills/" ] && ls "$_d/skills/" 2>/dev/null && break; done || echo "No global skills"`
 ```
 ```
 !`ls .claude/skills/ 2>/dev/null || echo "No project skills"`
@@ -57,7 +57,7 @@ Skills:
 
 **CRITICAL: Complete ENTIRE step (including writing settings.json) BEFORE Step 1. Use AskUserQuestion for prompts. Wait for answers. Write settings.json. Only then proceed.**
 
-**Resolve config directory:** Check env var `CLAUDE_CONFIG_DIR`. If set, use that as `CLAUDE_DIR`. Otherwise default to `~/.claude`. Use `CLAUDE_DIR` for all config paths in this command.
+**Resolve config directory:** Try in order: env var `CLAUDE_CONFIG_DIR` (if set and directory exists), `~/.config/claude-code` (if exists), otherwise `~/.claude`. Store result as `CLAUDE_DIR`. Use it for all config paths in this command.
 
 Read `CLAUDE_DIR/settings.json` (create `{}` if missing).
 
@@ -78,7 +78,7 @@ AskUserQuestion text: "○ VBW includes a custom status line showing phase progr
 
 If approved, set `statusLine` to:
 ```json
-{"type": "command", "command": "bash -c 'f=$(ls -1 \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"/plugins/cache/vbw-marketplace/vbw/*/scripts/vbw-statusline.sh 2>/dev/null | sort -V | tail -1) && [ -f \"$f\" ] && exec bash \"$f\"'"}
+{"type": "command", "command": "bash -c 'for _d in \"${CLAUDE_CONFIG_DIR:-}\" \"$HOME/.config/claude-code\" \"$HOME/.claude\"; do [ -z \"$_d\" ] && continue; f=$(ls -1 \"$_d\"/plugins/cache/vbw-marketplace/vbw/*/scripts/vbw-statusline.sh 2>/dev/null | sort -V | tail -1 || true); [ -f \"$f\" ] && exec bash \"$f\"; done'"}
 ```
 Object format with `type`+`command` is **required** — plain string fails silently.
 If declined: display "○ Skipped. Run /vbw:config to install it later."
@@ -179,7 +179,7 @@ fi
 
 ### Step 1.7: GSD isolation (conditional)
 
-**1.7a. Detection:** `[ -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/commands/gsd" ] || [ -d ".planning" ] || [ -d ".vbw-planning/gsd-archive" ]`
+**1.7a. Detection:** `[ -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/commands/gsd" ] || [ -d "$HOME/.config/claude-code/commands/gsd" ] || [ -d ".planning" ] || [ -d ".vbw-planning/gsd-archive" ]`
 - None true: GSD_DETECTED=false, display nothing, skip to Step 2
 - Any true: GSD_DETECTED=true, proceed to 1.7b
 
