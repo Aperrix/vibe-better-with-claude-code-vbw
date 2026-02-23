@@ -36,7 +36,7 @@ if [ -z "$VBW_PLUGIN_ROOT" ] || [ ! -d "$VBW_PLUGIN_ROOT" ]; then
 fi
 
 # Canonicalize to real path — survives cache symlink deletion mid-session
-VBW_PLUGIN_ROOT=$(cd "$VBW_PLUGIN_ROOT" 2>/dev/null && pwd -P) || true
+VBW_PLUGIN_ROOT=$(cd "$VBW_PLUGIN_ROOT" 2>/dev/null && pwd -P || echo "$VBW_PLUGIN_ROOT")
 ```
 
 All runtime script invocations below assume `VBW_PLUGIN_ROOT` is set.
