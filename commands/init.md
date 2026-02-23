@@ -490,12 +490,12 @@ If SKIP_INFERENCE=false (confirmed/corrected inference data):
 <!-- Final summary replaces old Step 4 auto-launch of /vbw:vibe -->
 <!-- User now has full project-defining files and can run /vbw:vibe when ready -->
 
-Display a Phase Banner (double-line box per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md) with the title "VBW Initialization Complete".
+Display a banner per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md with the title "VBW Initialization Complete".
 
 ```
-╔══════════════════════════════════════╗
-║   VBW Initialization Complete        ║
-╚══════════════════════════════════════╝
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VBW Initialization Complete
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 **File checklist:** Display all created/updated files:

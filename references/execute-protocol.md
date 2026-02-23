@@ -467,15 +467,15 @@ If `AUTO_UAT` is not `true` and autonomy is confident or pure-vibe: display "○
 
    For the FIRST test without a result, display:
    ```
-   ┌─ CHECKPOINT {N}/{total} ──────────────────────┐
-   │  Plan: {plan-id} -- {plan-title}               │
-   │                                                │
-   │  {scenario description}                        │
-   │                                                │
-   │  Expected: {expected result}                   │
-   │                                                │
-   │  → Type "pass" or describe what's wrong        │
-   └────────────────────────────────────────────────┘
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CHECKPOINT {N}/{total} — {plan-id}: {plan-title}
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   {scenario description}
+
+   Expected: {expected result}
+
+   → Type "pass" or describe what's wrong
    ```
 
    **STOP HERE.** Wait for the user's plain text response. Do NOT use AskUserQuestion. Do NOT continue to the next test or to Step 5.
@@ -577,9 +577,9 @@ fi
 
 Display per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md:
 ```text
-╔═══════════════════════════════════════════════╗
-║  Phase {N}: {name} -- Built                   ║
-╚═══════════════════════════════════════════════╝
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Phase {N}: {name} -- Built
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Plan Results:
     ✓ Plan 01: {title}  /  ✗ Plan 03: {title} (failed)

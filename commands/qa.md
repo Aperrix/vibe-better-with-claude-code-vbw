@@ -97,9 +97,9 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
 
 1. **Present:** Per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md:
     ```text
-    ┌──────────────────────────────────────────┐
-    │  Phase {N}: {name} -- Verified           │
-    └──────────────────────────────────────────┘
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    Phase {N}: {name} -- Verified
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
       Tier:     {quick|standard|deep}
       Result:   {✓ PASS | ✗ FAIL | ◆ PARTIAL}

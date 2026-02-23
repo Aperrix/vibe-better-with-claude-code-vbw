@@ -90,16 +90,16 @@ Write the initial `{phase}-UAT.md` in the phase directory using the `templates/U
 
 **This is a conversational loop. Present ONE test, then STOP and wait for the user to respond. Do NOT present multiple tests at once. Do NOT skip ahead. Do NOT end the session after presenting a test.**
 
-For the FIRST test without a result, display a CHECKPOINT block followed by AskUserQuestion:
+For the FIRST test without a result, display a CHECKPOINT followed by AskUserQuestion:
 
 ```
-┌─ CHECKPOINT {N}/{total} ──────────────────────┐
-│  Plan: {plan-id} -- {plan-title}               │
-│                                                │
-│  {scenario description}                        │
-│                                                │
-│  Expected: {expected result}                   │
-└────────────────────────────────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CHECKPOINT {N}/{total} — {plan-id}: {plan-title}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{scenario description}
+
+**Expected:** {expected result}
 ```
 
 Then immediately use AskUserQuestion:
@@ -157,9 +157,9 @@ Issue recorded (severity: {level}). Final next-step routing shown at UAT summary
 - Display summary:
 
 ```
-┌──────────────────────────────────────────┐
-│  Phase {N}: {name} -- UAT Complete       │
-└──────────────────────────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Phase {N}: {name} — UAT Complete
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Result:   {✓ PASS | ✗ ISSUES FOUND}
   Passed:   {N}
@@ -167,7 +167,6 @@ Issue recorded (severity: {level}). Final next-step routing shown at UAT summary
   Issues:   {N}
 
   Report:   {path to UAT.md}
-
 ```
 
 **Discovered Issues:** If the user reported failures or bugs during CHECKPOINT responses that are clearly unrelated to this phase's work (e.g., "this other test was already broken"), extract structured fields on a best-effort basis: use the test name if mentioned (or infer from context), the file path if identifiable, and the error text as reported. If the user's description is too vague to extract a test name or file, use the description verbatim as the error field and mark test/file as "unknown". De-duplicate by test name and file. Cap the list at 20 entries; if more exist, show the first 20 and append `... and {N} more`. Append after the result box:
