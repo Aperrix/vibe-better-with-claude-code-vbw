@@ -45,28 +45,28 @@ _guard_pattern() {
   printf 'while [ ! -L "$L" ] && [ $i -lt 20 ]'
 }
 
-@test "vibe.md has 2 guarded symlink template expressions" {
+@test "vibe.md has 1 guarded symlink template expression" {
   local count
   count=$(grep -cF "$(_guard_pattern)" "$PROJECT_ROOT/commands/vibe.md")
-  [ "$count" -eq 2 ]
+  [ "$count" -eq 1 ]
 }
 
-@test "qa.md has 2 guarded symlink template expressions" {
+@test "qa.md has 1 guarded symlink template expression" {
   local count
   count=$(grep -cF "$(_guard_pattern)" "$PROJECT_ROOT/commands/qa.md")
-  [ "$count" -eq 2 ]
+  [ "$count" -eq 1 ]
 }
 
-@test "verify.md has 2 guarded symlink template expressions" {
+@test "verify.md has 1 guarded symlink template expression" {
   local count
   count=$(grep -cF "$(_guard_pattern)" "$PROJECT_ROOT/commands/verify.md")
-  [ "$count" -eq 2 ]
+  [ "$count" -eq 1 ]
 }
 
-@test "discuss.md has 2 guarded symlink template expressions" {
+@test "discuss.md has 1 guarded symlink template expression" {
   local count
   count=$(grep -cF "$(_guard_pattern)" "$PROJECT_ROOT/commands/discuss.md")
-  [ "$count" -eq 2 ]
+  [ "$count" -eq 1 ]
 }
 
 @test "help.md has 1 guarded symlink template expression" {
@@ -81,22 +81,51 @@ _guard_pattern() {
   [ "$count" -eq 1 ]
 }
 
-@test "resume.md has 1 guarded symlink template expression" {
+@test "resume.md has 0 guarded symlink template expressions (uses atomic cat)" {
   local count
-  count=$(grep -cF "$(_guard_pattern)" "$PROJECT_ROOT/commands/resume.md")
-  [ "$count" -eq 1 ]
+  count=$(grep -cF "$(_guard_pattern)" "$PROJECT_ROOT/commands/resume.md" || true)
+  [ "${count:-0}" -eq 0 ]
 }
 
-@test "total guarded symlink template expressions across commands is 11" {
+@test "total guarded symlink template expressions across commands is 6" {
   local count
   count=$(grep -rcF "$(_guard_pattern)" "$PROJECT_ROOT/commands/" 2>/dev/null | awk -F: '{s+=$NF} END{print s}')
-  [ "$count" -eq 11 ]
+  [ "$count" -eq 6 ]
 }
 
 @test "guarded expressions use symlink path variable not direct path" {
   # All guarded expressions should reference scripts via $L variable, not direct path
   run bash -c "grep -F '$(_guard_pattern)' \"$PROJECT_ROOT/commands/\"*.md | grep -v 'bash \"\$L/scripts/'"
   [ "$status" -eq 1 ]
+}
+
+# ── Atomic phase-detect via preamble temp file ──────────────────────────────
+# Phase-detect.sh runs atomically inside the preamble (same !` backtick) to
+# avoid race conditions between separate template expressions. The phase-detect
+# backtick just reads the temp file written by the preamble.
+
+_atomic_pd_preamble_pattern() {
+  printf 'phase-detect.sh" > "/tmp/.vbw-phase-detect-'
+}
+
+_atomic_pd_cat_pattern() {
+  printf 'cat "/tmp/.vbw-phase-detect-'
+}
+
+@test "commands with phase-detect run it atomically in preamble" {
+  for cmd in resume vibe discuss qa verify; do
+    local count
+    count=$(grep -cF "$(_atomic_pd_preamble_pattern)" "$PROJECT_ROOT/commands/${cmd}.md")
+    [ "$count" -eq 1 ] || { echo "FAIL: ${cmd}.md missing atomic phase-detect in preamble"; return 1; }
+  done
+}
+
+@test "commands with phase-detect use cat for temp file read" {
+  for cmd in resume vibe discuss qa verify; do
+    local count
+    count=$(grep -cF "$(_atomic_pd_cat_pattern)" "$PROJECT_ROOT/commands/${cmd}.md")
+    [ "$count" -eq 1 ] || { echo "FAIL: ${cmd}.md missing cat for phase-detect temp file"; return 1; }
+  done
 }
 
 # ── UAT protocol safeguards ─────────────────────────────────────────────────
