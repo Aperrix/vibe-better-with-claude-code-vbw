@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -u
 
 # map-verify-response.sh
 # Deterministic helper for verify.md freeform intent mapping.
-# Output is one token: pass | skip | issue | pass_with_observation | skip_with_observation
+# Pure bash — no grep/awk to avoid GNU vs BSD portability issues.
+# Output: pass | skip | issue | pass_with_observation | skip_with_observation
 
 input="${*:-}"
 if [ -z "$input" ] && [ ! -t 0 ]; then
@@ -22,42 +23,53 @@ normalized=$(printf '%s' "$input" |
 skip_re='(^|[^[:alnum:]_])(skip|skipped|next|n/a|na|later|defer)([^[:alnum:]_]|$)'
 pass_re="(^|[^[:alnum:]_])(pass|passed|looks good|works|correct|confirmed|yes|good|fine|ok|okay|not bad|can't complain|cant complain|cannot complain)([^[:alnum:]_]|$)"
 idiom_positive_re="(^|[^[:alnum:]_])(not bad|can't complain|cant complain|cannot complain)([^[:alnum:]_]|$)"
-separator_re='( but | however | although | though | also |,|;|\.|:| - )'
-issue_signal_re="(broken|bug|error|wrong|incorrect|missing|not working|doesn't work|doesnt work|fails?|failing|crash|exception|regress|problem|glitch|unusable|blocked)"
-negated_pass_re="(not|no|never|don't|doesn't|didn't|isn't|wasn't|cannot|can't|cant|won't|wont|wouldn't|shouldn't|hardly|barely)( [a-z]+){0,3} (pass|passed|works?|good|fine|ok|okay|correct|confirmed)"
+separator_re=' but | however | although | though | also |[,;.:] | - '
+issue_signal_re='(broken|bug|error|wrong|incorrect|missing|not working|doesnt work|fails|fail|failing|crash|exception|regress|problem|glitch|unusable|blocked)'
+negated_pass_re="(not|no|never|don't|doesn't|didn't|isn't|wasn't|cannot|can't|cant|won't|wont|wouldn't|shouldn't|hardly|barely)( [a-z]+){0,3} (pass|passed|works|work|good|fine|ok|okay|correct|confirmed)"
 negated_think_works_re="(don't|doesn't|didn't|cannot|can't|cant) (think|feel|guess|believe|know)( [a-z]+){0,4} (work|works|working)"
 skip_deferral_re="skip( this)?( checkpoint| test)?( for now| right now)?|can't test( right now| now)?|cannot test( right now| now)?|defer( this| for now)?"
 
-contains_regex() {
-  local text="$1"
-  local re="$2"
-  printf '%s\n' "$text" | grep -Eq "$re"
+# Use bash [[ =~ ]] instead of grep/awk for cross-platform portability.
+matches_re() {
+  [[ "$1" =~ $2 ]]
 }
 
+# Find 1-based position of first regex match, or 0 if no match.
 first_pos() {
   local text="$1"
   local re="$2"
-  printf '%s\n' "$text" | awk -v r="$re" '{ if (match($0, r)) print RSTART; else print 0 }'
+  if [[ "$text" =~ $re ]]; then
+    local match="${BASH_REMATCH[0]}"
+    local before="${text%%"$match"*}"
+    echo $(( ${#before} + 1 ))
+  else
+    echo 0
+  fi
 }
 
-tail_text=$(printf '%s\n' "$normalized" | awk -v re="$separator_re" '{ if (match($0, re)) { print substr($0, RSTART + RLENGTH); exit } }')
+# Extract text after the first separator match.
+tail_text=""
+if matches_re "$normalized" "$separator_re"; then
+  local_match="${BASH_REMATCH[0]}"
+  tail_text="${normalized#*"$local_match"}"
+fi
 
 has_skip=0
 has_pass=0
 idiomatic_positive=0
 tail_has_issue=0
 
-contains_regex "$normalized" "$skip_re" && has_skip=1
-contains_regex "$normalized" "$pass_re" && has_pass=1
-contains_regex "$normalized" "$idiom_positive_re" && idiomatic_positive=1
+matches_re "$normalized" "$skip_re" && has_skip=1 || true
+matches_re "$normalized" "$pass_re" && has_pass=1 || true
+matches_re "$normalized" "$idiom_positive_re" && idiomatic_positive=1 || true
 
-if [ -n "${tail_text:-}" ] && contains_regex "$tail_text" "$issue_signal_re"; then
+if [ -n "${tail_text:-}" ] && matches_re "$tail_text" "$issue_signal_re"; then
   tail_has_issue=1
 fi
 
 # Expanded negation guard, with idiomatic-positive exceptions.
 if [ "$has_pass" -eq 1 ] && [ "$idiomatic_positive" -eq 0 ]; then
-  if contains_regex "$normalized" "$negated_pass_re" || contains_regex "$normalized" "$negated_think_works_re"; then
+  if matches_re "$normalized" "$negated_pass_re" || matches_re "$normalized" "$negated_think_works_re"; then
     echo "issue"
     exit 0
   fi
@@ -66,7 +78,7 @@ fi
 primary="none"
 
 if [ "$has_skip" -eq 1 ] && [ "$has_pass" -eq 1 ]; then
-  if contains_regex "$normalized" "$skip_deferral_re"; then
+  if matches_re "$normalized" "$skip_deferral_re"; then
     primary="skip"
   else
     pass_pos=$(first_pos "$normalized" "$pass_re")
