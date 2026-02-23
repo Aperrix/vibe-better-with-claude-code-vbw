@@ -100,6 +100,7 @@ For the FIRST test without a result, display a CHECKPOINT followed by AskUserQue
 {scenario description}
 
 **Expected:** {expected result}
+
 ```
 
 Then immediately use AskUserQuestion:
