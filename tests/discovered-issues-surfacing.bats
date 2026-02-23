@@ -610,55 +610,58 @@ load test_helper
 }
 
 # =============================================================================
-# QA round 2 (PR #142): negation guard, word-boundary, tie-break, response shape
+# QA round 3 (PR #142): behavior assertions for verify response mapping
 # =============================================================================
 
-@test "verify command freeform has negation guard" {
-  grep -qi 'negation guard' "$PROJECT_ROOT/commands/verify.md"
+@test "verify response mapping treats idiomatic positive 'not bad' as pass" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "not bad"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pass" ]
 }
 
-@test "verify command negation guard lists negation words" {
-  # Must list at least the core negation words
-  for word in "not" "don't" "doesn't" "didn't" "isn't" "never" "cannot" "can't"; do
-    grep -qi "$word" "$PROJECT_ROOT/commands/verify.md" || { echo "Missing negation word: $word"; return 1; }
-  done
+@test "verify response mapping handles curly apostrophe in can't complain" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "can’t complain"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pass" ]
 }
 
-@test "verify command negation guard gives examples" {
-  # Must have at least one example showing negation -> issue
-  grep -qi 'not good.*issue\|not good.*not a pass' "$PROJECT_ROOT/commands/verify.md"
+@test "verify response mapping catches non-adjacent negation scope" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "I don't think it works"
+  [ "$status" -eq 0 ]
+  [ "$output" = "issue" ]
 }
 
-@test "verify command has dual-intent tie-break rule" {
-  grep -qi 'dual-intent tie-break\|tie-break' "$PROJECT_ROOT/commands/verify.md"
+@test "verify response mapping prefers skip when current checkpoint is explicitly deferred" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "Pass overall, but skip this checkpoint for now"
+  [ "$status" -eq 0 ]
+  [ "$output" = "skip" ]
 }
 
-@test "verify command tie-break resolves by first intent word" {
-  grep -qi 'first intent word' "$PROJECT_ROOT/commands/verify.md"
+@test "verify response mapping does not create false observation from positive separator text" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "pass: looks great"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pass" ]
 }
 
-@test "verify command word-boundary rule has regex equivalent" {
-  # Must reference \b or equivalent
-  grep -q '\\b' "$PROJECT_ROOT/commands/verify.md"
+@test "verify response mapping classifies pass with defect observation" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "pass, but the sidebar is broken"
+  [ "$status" -eq 0 ]
+  [ "$output" = "pass_with_observation" ]
 }
 
-@test "verify command word-boundary rule gives positive and negative examples" {
-  # Must show both matching and non-matching examples
-  grep -qi 'passport' "$PROJECT_ROOT/commands/verify.md"
-  grep -qi 'worksmanship' "$PROJECT_ROOT/commands/verify.md"
+@test "verify response mapping classifies skip with defect observation" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "skip, but the sidebar is broken"
+  [ "$status" -eq 0 ]
+  [ "$output" = "skip_with_observation" ]
 }
 
-@test "verify command freeform separators include colon and em dash" {
-  # QA finding: separator list should include colon and em dash
-  grep -qi 'colon.*em dash\|em dash.*colon' "$PROJECT_ROOT/commands/verify.md"
+@test "verify response mapping falls back to issue for unmatched freeform" {
+  run bash "$PROJECT_ROOT/scripts/map-verify-response.sh" "kinda flaky and weird"
+  [ "$status" -eq 0 ]
+  [ "$output" = "issue" ]
 }
 
-@test "verify command skip button response shape clarifies additional text" {
-  # Step 5 Skip path must specify where observation text appears
-  sed -n '/\*\*"Skip" selected:\*\*/,/\*\*Freeform/p' "$PROJECT_ROOT/commands/verify.md" | grep -qi 'additional text\|response content\|response body'
-}
-
-@test "verify command pass-intent with observation captures text after separator" {
-  # Must specify what gets captured as the discovered issue
-  grep -qi 'everything after the separator\|observation text.*after' "$PROJECT_ROOT/commands/verify.md"
+@test "verify command documents idiomatic positives and issue-signal guard" {
+  grep -qi 'Idiomatic-positive exceptions' "$PROJECT_ROOT/commands/verify.md"
+  grep -qi 'Observation extraction guard' "$PROJECT_ROOT/commands/verify.md"
 }

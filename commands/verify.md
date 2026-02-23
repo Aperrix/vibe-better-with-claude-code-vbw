@@ -125,27 +125,39 @@ Map the AskUserQuestion response:
 
 **"Skip" selected:** Record as skipped. **However**, if the user selected "Skip" but also typed additional text describing a bug/issue (e.g., the response body contains "but the sidebar is broken" alongside the Skip selection), record the test as skipped AND capture the additional text as a discovered issue (see Step 6a). The additional text is the response content beyond the option selection itself.
 
-**Freeform text (via "Other"):** Apply case-insensitive, trimmed matching in this order.
+**Freeform text (via "Other"):** Apply case-insensitive matching in this order after normalization.
+
+**Normalization (required first):**
+- Trim surrounding whitespace.
+- Lowercase.
+- Treat curly apostrophes as straight apostrophes (`can’t` == `can't`).
+- Treat em/en dashes as dash separators.
 
 **Word-boundary rule:** Match intent keywords as whole words only — a keyword matches when it is surrounded by whitespace, punctuation, or string boundaries (equivalent to regex `\b`). Examples: "pass" matches in "pass, but..." and "Pass." but NOT in "passport"; "works" matches in "it works" but NOT in "worksmanship"; "good" matches in "looks good" but NOT in "goodness".
 
-**Negation guard:** Before classifying as pass-intent, check whether the pass-intent word is immediately preceded by a negation word (not, don't, doesn't, didn't, isn't, wasn't, no, never, neither, nor, hardly, barely, cannot, can't, won't, wouldn't, shouldn't). If a negation precedes the pass-intent word within the same clause, treat the entire response as an issue (go to Step 6). Examples: "not good, still broken" → issue (not a pass); "doesn't work at all" → issue; "it works" → pass.
+**Idiomatic-positive exceptions:** These should count as pass-intent (not issues): `not bad`, `can't complain`, `cant complain`, `cannot complain`.
 
-**Dual-intent tie-break:** If a response contains BOTH skip-intent and pass-intent words (e.g., "pass — I'll skip checking the edge case"), resolve by the **first intent word found** reading left-to-right. If both appear in the same position (impossible in practice), prefer skip-intent. This ordering matches the evaluation order below.
+**Negation guard (expanded scope):** Before classifying as pass-intent, detect negation in the same clause even when not immediately adjacent. If a negation term appears up to a few words before pass-intent (or in patterns like "I don't think it works"), treat as issue (Step 6), unless the text matches an idiomatic-positive exception above. Negation terms: not, don't, doesn't, didn't, isn't, wasn't, no, never, neither, nor, hardly, barely, cannot, can't, won't, wouldn't, shouldn't. Examples: "not good, still broken" → issue; "I don't think it works" → issue; "it works" → pass.
+
+**Observation extraction guard:** Only create a discovered issue when text after a separator includes a defect/issue signal (e.g., broken, bug, error, wrong, missing, not working, fails, crash, exception, regression, problem). If trailing text is neutral/positive only (e.g., "pass: looks great"), do NOT create a discovered issue.
+
+**Dual-intent tie-break (pass + skip in one response):**
+- If the response explicitly defers the **current checkpoint** (e.g., "skip this checkpoint", "skip for now", "can't test right now"), classify checkpoint outcome as **skip**.
+- Otherwise, use the first intent word left-to-right as fallback.
 
 Evaluate in this order:
-- **Skip-intent with observation:** If the text starts with or contains a skip-intent word (skip, skipped, next, n/a, na, later, defer) as a whole word AND also contains additional text describing a bug, issue, or observation after a separator (but, however, also, although, though, comma, semicolon, period, dash, colon, em dash, newline), then: record the test as **skipped** AND capture the observation text (everything after the separator) as a discovered issue (see Step 6a). Example: "skip, but the sidebar is completely broken" → test skipped, discovered issue created.
-- **Skip-intent only:** If the text is just a skip-intent word with no issue observation → record as skipped.
-- **Pass-intent with observation:** If the text starts with or contains a pass-intent word (pass, passed, looks good, works, correct, confirmed, yes, good, fine, ok) as a whole word (and not negated — see negation guard above) AND also contains additional text describing a bug, issue, or observation after a separator (but, however, also, although, though, comma, semicolon, period, dash, colon, em dash, newline), then: record the test as **passed** AND capture the observation text (everything after the separator) as a discovered issue (see Step 6a). Example: "pass, but I noticed the stats section still shows for positions with no covered calls" → test passes, discovered issue created.
-- **Pass-intent only:** If the text is just a pass-intent word (not negated) with no issue observation → record as passed.
-- **Anything else:** treat the entire response text as an issue description (go to Step 6).
+- **Skip-intent with issue observation:** If the text contains a skip-intent whole word (skip, skipped, next, n/a, na, later, defer) AND contains post-separator text with an issue signal, then: record the test as **skipped** AND capture the post-separator observation text as a discovered issue (Step 6a). Separators: but, however, also, although, though, comma, semicolon, period, dash, colon, em dash, newline. Example: "skip, but the sidebar is completely broken" → skipped + discovered issue.
+- **Skip-intent only:** If skip-intent is present but no issue observation in post-separator text → record as skipped.
+- **Pass-intent with issue observation:** If the text contains pass-intent as whole words/phrases (pass, passed, looks good, works, correct, confirmed, yes, good, fine, ok, okay, not bad, can't complain, cant complain, cannot complain), is not negated by the expanded negation guard, and has post-separator issue text, then: record the test as **passed** AND capture the post-separator observation text as a discovered issue (Step 6a). Example: "pass, but I noticed the stats section still shows for positions with no covered calls" → passed + discovered issue.
+- **Pass-intent only:** Pass-intent present, not negated, and no issue observation in post-separator text → record as passed.
+- **Anything else:** treat the entire response text as an issue description (Step 6).
 
 ### 6. Issue handling (when response = issue)
 
 The user's response text IS the issue description. Infer severity from keywords (never ask the user):
 
 | Keywords | Severity |
-|----------|----------|
+| --- | --- |
 | crash, broken, error, doesn't work, fails, exception | critical |
 | wrong, incorrect, missing, not working, bug | major |
 | minor, cosmetic, nitpick, small, typo, polish | minor |
@@ -227,4 +239,4 @@ These are already recorded in the UAT.md and will flow into remediation alongsid
   - All issues are `minor`:
     - `Suggest /vbw:fix to address recorded issues.`
 
-Run `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/suggest-next.sh verify {result} {phase}` and display.
+Run `bash "$(echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default})/scripts/suggest-next.sh" verify {result} {phase}` and display.
