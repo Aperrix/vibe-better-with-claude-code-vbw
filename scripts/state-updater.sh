@@ -216,7 +216,7 @@ advance_phase() {
   next_has_uat=false
   all_done=true
 
-  for dir in $(ls -d "$phases_dir"/*/ 2>/dev/null | sort -V); do
+  for dir in $(ls -d "$phases_dir"/*/ 2>/dev/null | (sort -V 2>/dev/null || awk -F/ '{n=$NF; gsub(/[^0-9].*/,"",n); if (n == "") n=0; print (n+0)"\t"$0}' | sort -n -k1,1 -k2,2 | cut -f2-)); do
     local dirname p s
     dirname=$(basename "$dir")
     p=$(ls -1 "$dir"*-PLAN.md 2>/dev/null | wc -l | tr -d ' ')

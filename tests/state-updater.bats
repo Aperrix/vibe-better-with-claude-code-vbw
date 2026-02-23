@@ -160,3 +160,54 @@ EOF
   jq -e '.plans[0].status == "complete"' .vbw-planning/milestones/m1/.execution-state.json >/dev/null
   jq -e '.plans[0].status == "pending"' .vbw-planning/.execution-state.json >/dev/null
 }
+
+@test "advance_phase sets needs_remediation when next phase has UAT issues" {
+  cd "$TEST_TEMP_DIR"
+
+  # Create 2 phases: phase 1 complete, phase 2 has UAT issues
+  mkdir -p .vbw-planning/phases/01-setup
+  mkdir -p .vbw-planning/phases/02-core
+
+  cat > .vbw-planning/STATE.md <<'EOF'
+Phase: 1 of 2 (Setup)
+Plans: 0/1
+Progress: 0%
+Status: active
+EOF
+
+  cat > .vbw-planning/ROADMAP.md <<'EOF'
+- [ ] Phase 1: Setup
+- [ ] Phase 2: Core
+
+| Phase | Progress | Status | Completed |
+|------|----------|--------|-----------|
+| 1 - Setup | 0/1 | active | - |
+| 2 - Core | 0/0 | pending | - |
+EOF
+
+  # Phase 1: one plan, one summary (complete)
+  echo "# plan" > .vbw-planning/phases/01-setup/01-01-PLAN.md
+  echo "# summary" > .vbw-planning/phases/01-setup/01-01-SUMMARY.md
+
+  # Phase 2: one plan, one summary (complete), but has UAT issues
+  echo "# plan" > .vbw-planning/phases/02-core/02-01-PLAN.md
+  echo "# summary" > .vbw-planning/phases/02-core/02-01-SUMMARY.md
+  cat > .vbw-planning/phases/02-core/02-01-UAT.md <<'EOF'
+---
+status: issues_found
+---
+
+# UAT Issues
+- Something broken
+EOF
+
+  local summary_path input
+  summary_path="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup/01-01-SUMMARY.md"
+  input=$(jq -nc --arg p "$summary_path" '{tool_input:{file_path:$p}}')
+
+  run bash -c "cd '$TEST_TEMP_DIR' && printf '%s' '$input' | bash '$SCRIPTS_DIR/state-updater.sh'"
+  [ "$status" -eq 0 ]
+
+  grep -q '^Status: needs_remediation$' .vbw-planning/STATE.md
+  grep -q '^Phase: 2 of 2 (Core)$' .vbw-planning/STATE.md
+}
