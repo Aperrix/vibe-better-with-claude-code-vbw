@@ -11,28 +11,28 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 ## Context
 
 Working directory:
-```
+```bash
 !`pwd`
 ```
 Plugin root:
-```
+```bash
 !`VBW_CACHE_ROOT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/vbw-marketplace/vbw"; R=""; if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "${CLAUDE_PLUGIN_ROOT}/scripts/hook-wrapper.sh" ]; then R="${CLAUDE_PLUGIN_ROOT}"; fi; if [ -z "$R" ] && [ -f "${VBW_CACHE_ROOT}/local/scripts/hook-wrapper.sh" ]; then R="${VBW_CACHE_ROOT}/local"; fi; if [ -z "$R" ]; then V=$(ls -1d "${VBW_CACHE_ROOT}"/* 2>/dev/null | awk -F/ '{print $NF}' | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1); [ -n "$V" ] && [ -f "${VBW_CACHE_ROOT}/${V}/scripts/hook-wrapper.sh" ] && R="${VBW_CACHE_ROOT}/${V}"; fi; if [ -z "$R" ]; then L=$(ls -1d "${VBW_CACHE_ROOT}"/* 2>/dev/null | awk -F/ '{print $NF}' | sort | tail -1); [ -n "$L" ] && [ -f "${VBW_CACHE_ROOT}/${L}/scripts/hook-wrapper.sh" ] && R="${VBW_CACHE_ROOT}/${L}"; fi; if [ -z "$R" ]; then D=$(ps axww -o args= 2>/dev/null | grep -v grep | sed -n 's/.*--plugin-dir  *\([^ ]*\).*/\1/p' | head -1); [ -n "$D" ] && [ -f "$D/scripts/hook-wrapper.sh" ] && R="$D"; fi; if [ -z "$R" ] || [ ! -d "$R" ]; then echo "VBW: plugin root resolution failed" >&2; exit 1; fi; SESSION_KEY="${CLAUDE_SESSION_ID:-default}"; LINK="/tmp/.vbw-plugin-root-link-${SESSION_KEY}"; rm -f "$LINK"; ln -s "$R" "$LINK" 2>/dev/null || { echo "VBW: plugin root link failed" >&2; exit 1; }; echo "$LINK"`
 ```
 
 Current state:
-```
+```bash
 !`head -40 .vbw-planning/STATE.md 2>/dev/null || echo "No state found"`
 ```
 
 Config: Pre-injected by SessionStart hook.
 
 Phase directories:
-```
+```bash
 !`ls .vbw-planning/phases/ 2>/dev/null || echo "No phases directory"`
 ```
 
 Phase state:
-```
+```bash
 !`L="/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}"; i=0; while [ ! -L "$L" ] && [ $i -lt 20 ]; do sleep 0.1; i=$((i+1)); done; bash "$L/scripts/phase-detect.sh" 2>/dev/null || echo "phase_detect_error=true"`
 ```
 
@@ -92,21 +92,18 @@ Write the initial `{phase}-UAT.md` in the phase directory using the `templates/U
 
 For the FIRST test without a result, display a CHECKPOINT followed by AskUserQuestion:
 
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   CHECKPOINT {N}/{total} — {plan-id}: {plan-title}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 {scenario description}
-
-**Expected:** {expected result}
-
 ```
 
 Then immediately use AskUserQuestion:
 
 ```yaml
-question: "Result for checkpoint {N}/{total}?"
+question: "Expected: {expected result}"
 header: "UAT"
 multiSelect: false
 options:
@@ -146,7 +143,7 @@ The user's response text IS the issue description. Infer severity from keywords 
 Record: description, inferred severity.
 
 Display:
-```
+```text
 Issue recorded (severity: {level}). Final next-step routing shown at UAT summary.
 ```
 
@@ -161,7 +158,7 @@ Issue recorded (severity: {level}). Final next-step routing shown at UAT summary
 - Update `{phase}-UAT.md` frontmatter: status (complete or issues_found), completed date, final counts
 - Display summary:
 
-```
+```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Phase {N}: {name} — UAT Complete
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

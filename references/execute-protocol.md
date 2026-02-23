@@ -207,7 +207,7 @@ if [ $? -ne 0 ]; then echo "$QA_MAX_TURNS" >&2; exit 1; fi
 ```
 
 For each uncompleted plan, TaskCreate:
-```
+```yaml
 subject: "Execute {NN-MM}: {plan-title}"
 description: |
   Execute all tasks in {PLAN_PATH}.
@@ -473,21 +473,18 @@ If `AUTO_UAT` is not `true` and autonomy is confident or pure-vibe: display "○
 
    For the FIRST test without a result, display a CHECKPOINT followed by AskUserQuestion:
 
-   ```
+   ```text
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    CHECKPOINT {N}/{total} — {plan-id}: {plan-title}
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
    {scenario description}
-
-   **Expected:** {expected result}
-
    ```
 
    Then immediately use AskUserQuestion:
 
    ```yaml
-   question: "Result for checkpoint {N}/{total}?"
+   question: "Expected: {expected result}"
    header: "UAT"
    multiSelect: false
    options:
