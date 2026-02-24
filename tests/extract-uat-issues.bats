@@ -114,7 +114,7 @@ issues: 3
   [[ "${lines[3]}" == "D1|major|Found during testing" ]]
 }
 
-@test "extract-uat-issues: long description is truncated" {
+@test "extract-uat-issues: long description is preserved in full" {
   local long_desc
   long_desc=$(printf 'x%.0s' {1..250})
   create_uat_file "---
@@ -138,10 +138,9 @@ issues: 1
   run bash "$SCRIPTS_DIR/extract-uat-issues.sh" "$PHASE_DIR"
 
   [ "$status" -eq 0 ]
-  # Description should be truncated to ~200 chars with "..."
-  [[ "${lines[1]}" == *"..."* ]]
-  # Full line should be under 220 chars (ID|severity| + 200 desc)
-  [ ${#lines[1]} -lt 220 ]
+  # Description must NOT be truncated — full 250 chars preserved
+  [[ "${lines[1]}" != *"..."* ]]
+  [[ "${lines[1]}" == "P01-T1|major|${long_desc}" ]]
 }
 
 @test "extract-uat-issues: no UAT file returns error marker" {

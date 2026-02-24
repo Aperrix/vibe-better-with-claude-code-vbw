@@ -9,8 +9,8 @@
 #
 # Example output:
 #   uat_phase=03 uat_issues_total=1 uat_file=03-UAT.md
-#   P01-T2|major|Data Quality share breakdown only shows on...
-#   D1|minor|Some discovered issue description...
+#   P01-T2|major|Data Quality share breakdown only shows on positions where transferred-in shares are the ONLY source
+#   D1|minor|Some discovered issue description
 
 set -euo pipefail
 
@@ -84,8 +84,6 @@ awk '
     desc = $0
     sub(/^[[:space:]]*- Description:[[:space:]]*/, "", desc)
     gsub(/[[:space:]]+$/, "", desc)
-    # Truncate long descriptions to save tokens
-    if (length(desc) > 200) desc = substr(desc, 1, 197) "..."
     description = desc
     next
   }
