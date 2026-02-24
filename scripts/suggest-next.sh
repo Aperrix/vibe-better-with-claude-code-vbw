@@ -26,6 +26,12 @@ TARGET_PHASE_ARG="${3:-}"
 PLANNING_DIR=".vbw-planning"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Source shared UAT helpers (extract_status_value → aliased as read_status_field, latest_non_source_uat)
+# shellcheck source=uat-utils.sh
+. "$SCRIPT_DIR/uat-utils.sh"
+# Alias for backward compat within this script
+read_status_field() { extract_status_value "$@"; }
+
 list_child_dirs_sorted() {
   local parent="$1"
   [ -d "$parent" ] || return 0
@@ -76,37 +82,6 @@ first_unverified_slug=""
 next_phase_state=""
 pd_next_phase=""
 
-read_status_field() {
-  local file="$1"
-  local result
-  # Try frontmatter first
-  result=$(awk '
-    BEGIN { in_fm = 0 }
-    NR == 1 && /^---[[:space:]]*$/ { in_fm = 1; next }
-    in_fm && /^---[[:space:]]*$/ { exit }
-    in_fm && tolower($0) ~ /^[[:space:]]*status[[:space:]]*:/ {
-      value = $0
-      sub(/^[^:]*:[[:space:]]*/, "", value)
-      gsub(/[[:space:]]+$/, "", value)
-      print tolower(value)
-      exit
-    }
-  ' "$file" 2>/dev/null || true)
-  # Fallback: scan body for status: line (brownfield/manual UATs)
-  if [ -z "$result" ]; then
-    result=$(awk '
-      tolower($0) ~ /^[[:space:]]*status[[:space:]]*:/ {
-        value = $0
-        sub(/^[^:]*:[[:space:]]*/, "", value)
-        gsub(/[[:space:]]+$/, "", value)
-        print tolower(value)
-        exit
-      }
-    ' "$file" 2>/dev/null || true)
-  fi
-  printf '%s' "$result"
-}
-
 read_deviations_field() {
   local file="$1"
   awk '
@@ -121,30 +96,6 @@ read_deviations_field() {
       exit
     }
   ' "$file" 2>/dev/null || true
-}
-
-latest_non_source_uat() {
-  local dir="$1"
-  local f
-  local latest=""
-
-  case "$dir" in
-    */) ;;
-    *) dir="$dir/" ;;
-  esac
-
-  for f in "${dir}"[0-9]*-UAT.md; do
-    [ -e "$f" ] || continue
-    case "$f" in
-      *SOURCE-UAT.md) continue ;;
-    esac
-    latest="$f"
-  done
-
-  if [ -n "$latest" ]; then
-    printf '%s\n' "$latest"
-  fi
-  return 0
 }
 
 if [ -d "$PLANNING_DIR" ]; then
@@ -341,9 +292,12 @@ if [ -d "$PLANNING_DIR" ]; then
         fi
       done
 
-      # Check for completed UAT in active phase
+      # Check for completed UAT in active phase (exclude SOURCE-UAT copies)
       for uf in "$active_phase_dir"/*-UAT.md; do
         [ -f "$uf" ] || continue
+        case "$uf" in
+          *SOURCE-UAT.md) continue ;;
+        esac
         us=$(read_status_field "$uf")
         if [ "$us" = "complete" ] || [ "$us" = "passed" ]; then
           has_uat=true

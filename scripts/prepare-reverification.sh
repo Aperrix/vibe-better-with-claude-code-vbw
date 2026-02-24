@@ -28,69 +28,19 @@ if [ ! -d "$PHASE_DIR" ]; then
   exit 1
 fi
 
-# Reuse extract_status_value pattern from phase-detect.sh
-extract_status_value() {
-  local file="$1"
-  local result
-  # Try frontmatter first
-  result=$(awk '
-    BEGIN { in_fm = 0 }
-    NR == 1 && /^---[[:space:]]*$/ { in_fm = 1; next }
-    in_fm && /^---[[:space:]]*$/ { exit }
-    in_fm && tolower($0) ~ /^[[:space:]]*status[[:space:]]*:/ {
-      value = $0
-      sub(/^[^:]*:[[:space:]]*/, "", value)
-      gsub(/[[:space:]]+$/, "", value)
-      print tolower(value)
-      exit
-    }
-  ' "$file" 2>/dev/null || true)
-  # Fallback: scan body for status: line (brownfield/manual UATs)
-  if [ -z "$result" ]; then
-    result=$(awk '
-      tolower($0) ~ /^[[:space:]]*status[[:space:]]*:/ {
-        value = $0
-        sub(/^[^:]*:[[:space:]]*/, "", value)
-        gsub(/[[:space:]]+$/, "", value)
-        print tolower(value)
-        exit
-      }
-    ' "$file" 2>/dev/null || true)
-  fi
-  printf '%s' "$result"
-}
-
-# Find latest non-SOURCE UAT (same pattern as phase-detect.sh)
-latest_non_source_uat() {
-  local dir="$1"
-  local f
-  local latest=""
-
-  case "$dir" in
-    */) ;;
-    *) dir="$dir/" ;;
-  esac
-
-  for f in "${dir}"[0-9]*-UAT.md; do
-    [ -f "$f" ] || continue
-    case "$f" in
-      *SOURCE-UAT.md) continue ;;
-    esac
-    latest="$f"
-  done
-
-  if [ -n "$latest" ]; then
-    printf '%s\n' "$latest"
-  fi
-  return 0
-}
+# Source shared UAT helpers (extract_status_value, latest_non_source_uat)
+_SCRIPT_DIR_PR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=uat-utils.sh
+. "$_SCRIPT_DIR_PR/uat-utils.sh"
 
 # Find the UAT file
 UAT_FILE=$(latest_non_source_uat "$PHASE_DIR")
 
 if [ -z "$UAT_FILE" ] || [ ! -f "$UAT_FILE" ]; then
-  echo "Error: no UAT.md found in $PHASE_DIR — nothing to archive" >&2
-  exit 1
+  # Idempotent: if UAT was already archived (e.g., vibe.md ran this before
+  # routing to verify.md which runs it again), exit 0 with skip marker.
+  echo "skipped=already_archived"
+  exit 0
 fi
 
 # Check UAT status — only archive issues_found

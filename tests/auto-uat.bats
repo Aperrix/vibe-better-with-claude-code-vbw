@@ -681,15 +681,15 @@ EOF
   [[ "$output" == *"round_file=01-UAT-round-03.md"* ]]
 }
 
-@test "prepare-reverification fails when no UAT exists" {
+@test "prepare-reverification is idempotent when no UAT exists (already archived)" {
   cd "$TEST_TEMP_DIR"
   local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
   # Remove any UAT files (setup doesn't create one, but be explicit)
   rm -f "$dir"/[0-9]*-UAT.md
 
   run bash "$SCRIPTS_DIR/prepare-reverification.sh" "$dir"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"no UAT.md found"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipped=already_archived"* ]]
 }
 
 @test "prepare-reverification fails when UAT status is not issues_found" {
@@ -834,4 +834,65 @@ EOF
   [ ! -f "$dir/01-UAT.md" ]
   # Round file should exist
   ls "$dir"/01-UAT-round-*.md 2>/dev/null | grep -q .
+}
+
+# --- QA round 6: body-fallback tightening (finding #1) ---
+
+@test "phase-detect body-fallback ignores indented status lines" {
+  cd "$TEST_TEMP_DIR"
+  local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
+  # UAT file with NO frontmatter — only indented status: line (should NOT match)
+  printf '## Issue Details\n  status: needs_review\nThe component works.\n' > "$dir/01-UAT.md"
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  # Indented status: should NOT be detected → phase is unverified
+  [[ "$output" == *"has_unverified_phases=true"* ]]
+}
+
+@test "phase-detect body-fallback matches unindented status line" {
+  cd "$TEST_TEMP_DIR"
+  local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
+  # UAT file with NO frontmatter — unindented status: line (body fallback)
+  printf 'status: passed\nAll tests pass.\n' > "$dir/01-UAT.md"
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"has_unverified_phases=false"* ]]
+}
+
+# --- QA round 6: has_uat excludes SOURCE-UAT (finding #10) ---
+
+@test "suggest-next has_uat ignores SOURCE-UAT.md files" {
+  cd "$TEST_TEMP_DIR"
+  local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
+  # Only a SOURCE-UAT with passed status (not a real UAT)
+  printf -- '---\nstatus: passed\n---\nAll good.\n' > "$dir/01-SOURCE-UAT.md"
+
+  run bash "$SCRIPTS_DIR/suggest-next.sh" qa pass
+
+  [ "$status" -eq 0 ]
+  # SOURCE-UAT should NOT satisfy has_uat → verify should still be suggested
+  [[ "$output" == *"/vbw:verify"* ]]
+}
+
+# --- QA round 6: prepare-reverification double-run idempotency (finding #9) ---
+
+@test "prepare-reverification double-run is idempotent" {
+  cd "$TEST_TEMP_DIR"
+  local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
+  printf -- '---\nphase: 01\nstatus: issues_found\n---\nIssues.\n' > "$dir/01-UAT.md"
+  printf 'done' > "$dir/.uat-remediation-stage"
+
+  # First run: archives the UAT
+  run bash "$SCRIPTS_DIR/prepare-reverification.sh" "$dir"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"archived=01-UAT.md"* ]]
+  [ -f "$dir/01-UAT-round-01.md" ]
+  [ ! -f "$dir/01-UAT.md" ]
+
+  # Second run: should exit 0 with skip marker (no UAT to archive)
+  run bash "$SCRIPTS_DIR/prepare-reverification.sh" "$dir"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipped=already_archived"* ]]
 }

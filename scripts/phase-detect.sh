@@ -6,67 +6,17 @@ trap 'exit 0' EXIT
 
 PLANNING_DIR=".vbw-planning"
 
+# Source shared UAT helpers (extract_status_value, latest_non_source_uat)
+_SCRIPT_DIR_PD="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=uat-utils.sh
+. "$_SCRIPT_DIR_PD/uat-utils.sh"
+
 list_child_dirs_sorted() {
   local parent="$1"
   [ -d "$parent" ] || return 0
 
   find "$parent" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null |
     (sort -V 2>/dev/null || awk -F/ '{n=$NF; gsub(/[^0-9].*/,"",n); if (n == "") n=0; print (n+0)"\t"$0}' | sort -n -k1,1 -k2,2 | cut -f2-)
-}
-
-extract_status_value() {
-  local file="$1"
-  local result
-  # Try frontmatter first
-  result=$(awk '
-    BEGIN { in_fm = 0 }
-    NR == 1 && /^---[[:space:]]*$/ { in_fm = 1; next }
-    in_fm && /^---[[:space:]]*$/ { exit }
-    in_fm && tolower($0) ~ /^[[:space:]]*status[[:space:]]*:/ {
-      value = $0
-      sub(/^[^:]*:[[:space:]]*/, "", value)
-      gsub(/[[:space:]]+$/, "", value)
-      print tolower(value)
-      exit
-    }
-  ' "$file" 2>/dev/null || true)
-  # Fallback: scan body for status: line (brownfield/manual UATs)
-  if [ -z "$result" ]; then
-    result=$(awk '
-      tolower($0) ~ /^[[:space:]]*status[[:space:]]*:/ {
-        value = $0
-        sub(/^[^:]*:[[:space:]]*/, "", value)
-        gsub(/[[:space:]]+$/, "", value)
-        print tolower(value)
-        exit
-      }
-    ' "$file" 2>/dev/null || true)
-  fi
-  printf '%s' "$result"
-}
-
-latest_non_source_uat() {
-  local dir="$1"
-  local f
-  local latest=""
-
-  case "$dir" in
-    */) ;;
-    *) dir="$dir/" ;;
-  esac
-
-  for f in "${dir}"[0-9]*-UAT.md; do
-    [ -f "$f" ] || continue
-    case "$f" in
-      *SOURCE-UAT.md) continue ;;
-    esac
-    latest="$f"
-  done
-
-  if [ -n "$latest" ]; then
-    printf '%s\n' "$latest"
-  fi
-  return 0
 }
 
 # --- jq availability ---

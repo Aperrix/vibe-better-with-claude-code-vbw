@@ -61,7 +61,9 @@ Phase state:
 
 - If `next_phase_state=needs_reverification` (from Context above):
   - Run `prepare-reverification.sh {phase-dir}` to archive the old UAT and reset remediation stage
-  - Display: `Archived previous UAT → {round_file}. Starting fresh re-verification.`
+  - If the script outputs `skipped=already_archived`, display: `UAT already archived. Starting fresh re-verification.`
+  - If the script fails (non-zero exit), display the error message and **STOP** — do not continue to Step 3
+  - Otherwise display: `Archived previous UAT → {round_file}. Starting fresh re-verification.`
   - Continue to Step 3 (generate new tests) — do NOT resume the old UAT
 
 ### 3. Check for existing UAT session (resume support)
