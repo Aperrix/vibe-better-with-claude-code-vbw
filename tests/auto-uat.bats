@@ -245,19 +245,21 @@ EOF
   [ "$(grep -cF 'next phase' <<< "$output")" -eq 0 ]
 }
 
-@test "suggest-next execute with auto_uat=false mid-milestone suggests both verify and continue" {
+@test "suggest-next execute with auto_uat=false mid-milestone suggests continue not verify" {
   cd "$TEST_TEMP_DIR"
   local tmp
   tmp=$(mktemp)
   jq '.auto_uat = false' "$TEST_TEMP_DIR/.vbw-planning/config.json" > "$tmp" && mv "$tmp" "$TEST_TEMP_DIR/.vbw-planning/config.json"
-  # Phase 01 completed with no UAT, Phase 02 needs work
+  # Phase 01 completed with no UAT, Phase 02 needs work (unplanned → active, plans=0)
   mkdir -p "$TEST_TEMP_DIR/.vbw-planning/phases/02-polish"
 
   run bash "$SCRIPTS_DIR/suggest-next.sh" execute pass
 
   [ "$status" -eq 0 ]
-  # Should suggest both verify AND continue (auto_uat is off, user chooses)
-  [[ "$output" == *"/vbw:verify"* ]]
+  # auto_uat=false: cross-phase unverified detection doesn't fire
+  # Active phase (02) has 0 plans → active-phase verify path also doesn't fire
+  # Should suggest continue only
+  [ "$(grep -cF '/vbw:verify' <<< "$output")" -eq 0 ]
   [[ "$output" == *"/vbw:vibe"* ]]
 }
 
