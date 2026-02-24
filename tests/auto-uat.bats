@@ -59,7 +59,7 @@ teardown() {
   run bash "$SCRIPTS_DIR/suggest-next.sh" qa pass
 
   [ "$status" -eq 0 ]
-  [[ "$output" != *"/vbw:verify"* ]]
+  [ "$(grep -cF '/vbw:verify' <<< "$output")" -eq 0 ]
 }
 
 @test "suggest-next execute with auto_uat=true suggests verify even at confident" {
@@ -83,7 +83,7 @@ teardown() {
   run bash "$SCRIPTS_DIR/suggest-next.sh" execute pass
 
   [ "$status" -eq 0 ]
-  [[ "$output" != *"/vbw:verify"* ]]
+  [ "$(grep -cF '/vbw:verify' <<< "$output")" -eq 0 ]
 }
 
 @test "auto_uat defaults.json has auto_uat key set to false" {
@@ -133,7 +133,7 @@ EOF
 
   [ "$status" -eq 0 ]
   # Should NOT suggest verify since UAT already exists and completed
-  [[ "$output" != *"/vbw:verify"* ]]
+  [ "$(grep -cF '/vbw:verify' <<< "$output")" -eq 0 ]
 }
 
 # --- phase-detect auto_uat + has_unverified_phases tests ---
@@ -241,8 +241,8 @@ EOF
   # Should suggest verify
   [[ "$output" == *"/vbw:verify"* ]]
   # Should NOT suggest continuing to next phase when auto_uat wants verify first
-  [[ "$output" != *"Continue to"* ]]
-  [[ "$output" != *"next phase"* ]]
+  [ "$(grep -cF 'Continue to' <<< "$output")" -eq 0 ]
+  [ "$(grep -cF 'next phase' <<< "$output")" -eq 0 ]
 }
 
 @test "suggest-next execute with auto_uat=false mid-milestone suggests both verify and continue" {
@@ -258,5 +258,83 @@ EOF
   [ "$status" -eq 0 ]
   # Should suggest both verify AND continue (auto_uat is off, user chooses)
   [[ "$output" == *"/vbw:verify"* ]]
+  [[ "$output" == *"/vbw:vibe"* ]]
+}
+
+# --- QA round 1 regression tests (issue #148) ---
+
+@test "phase-detect treats UAT with draft status as unverified" {
+  cd "$TEST_TEMP_DIR"
+  # Phase 01 is fully built (from setup), add UAT with draft status
+  local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
+  printf -- '---\nphase: 01\nstatus: draft\n---\nIn progress.\n' > "$dir/01-UAT.md"
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  # UAT exists but is draft — should still be unverified
+  [[ "$output" == *"has_unverified_phases=true"* ]]
+}
+
+@test "phase-detect treats UAT with complete status as verified" {
+  cd "$TEST_TEMP_DIR"
+  local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
+  printf -- '---\nphase: 01\nstatus: complete\n---\nAll passed.\n' > "$dir/01-UAT.md"
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"has_unverified_phases=false"* ]]
+}
+
+@test "phase-detect treats UAT with issues_found status as verified" {
+  cd "$TEST_TEMP_DIR"
+  local dir="$TEST_TEMP_DIR/.vbw-planning/phases/01-setup"
+  printf -- '---\nphase: 01\nstatus: issues_found\n---\nIssues.\n' > "$dir/01-UAT.md"
+
+  run bash "$SCRIPTS_DIR/phase-detect.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"has_unverified_phases=false"* ]]
+}
+
+@test "suggest-next execute avoids dead-end when active phase has stale UAT" {
+  cd "$TEST_TEMP_DIR"
+  # Phase 01: fully built (from setup), no UAT → unverified
+  # Phase 02: unbuilt but has stale UAT with status: complete
+  local dir2="$TEST_TEMP_DIR/.vbw-planning/phases/02-polish"
+  mkdir -p "$dir2"
+  printf -- '---\nphase: 02\nstatus: complete\n---\nStale UAT.\n' > "$dir2/02-UAT.md"
+
+  run bash "$SCRIPTS_DIR/suggest-next.sh" execute pass
+
+  [ "$status" -eq 0 ]
+  # Must suggest verify (for unverified Phase 01) even though active Phase 02 has UAT
+  [[ "$output" == *"/vbw:verify"* ]]
+}
+
+@test "suggest-next qa pass with auto_uat=true mid-milestone suppresses continue" {
+  cd "$TEST_TEMP_DIR"
+  # Phase 01 completed with no UAT, Phase 02 needs work
+  mkdir -p "$TEST_TEMP_DIR/.vbw-planning/phases/02-polish"
+
+  run bash "$SCRIPTS_DIR/suggest-next.sh" qa pass
+
+  [ "$status" -eq 0 ]
+  # Should suggest verify
+  [[ "$output" == *"/vbw:verify"* ]]
+  # Should NOT suggest continuing to next phase
+  [ "$(grep -cF 'Continue to' <<< "$output")" -eq 0 ]
+  [ "$(grep -cF 'next phase' <<< "$output")" -eq 0 ]
+}
+
+@test "suggest-next qa pass with auto_uat=false mid-milestone suggests continue" {
+  cd "$TEST_TEMP_DIR"
+  local tmp
+  tmp=$(mktemp)
+  jq '.auto_uat = false' "$TEST_TEMP_DIR/.vbw-planning/config.json" > "$tmp" && mv "$tmp" "$TEST_TEMP_DIR/.vbw-planning/config.json"
+  mkdir -p "$TEST_TEMP_DIR/.vbw-planning/phases/02-polish"
+
+  run bash "$SCRIPTS_DIR/suggest-next.sh" qa pass
+
+  [ "$status" -eq 0 ]
+  # Should suggest continue (auto_uat off, no suppression)
   [[ "$output" == *"/vbw:vibe"* ]]
 }

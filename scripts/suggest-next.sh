@@ -457,8 +457,11 @@ case "$CMD" in
         fi
         ;;
       *)
-        # Suggest UAT for cautious/standard autonomy when no UAT exists, or always when auto_uat=true
-        if [ "$has_uat" = false ] && { [ "$cfg_auto_uat" = true ] || [ "$cfg_autonomy" = "cautious" ] || [ "$cfg_autonomy" = "standard" ]; }; then
+        # Suggest UAT verification when:
+        # 1. Active phase has no UAT AND (auto_uat or cautious/standard autonomy)
+        # 2. auto_uat=true AND some completed phase is unverified (cross-phase)
+        if { [ "$has_uat" = false ] && { [ "$cfg_auto_uat" = true ] || [ "$cfg_autonomy" = "cautious" ] || [ "$cfg_autonomy" = "standard" ]; }; } \
+           || { [ "$cfg_auto_uat" = true ] && [ "$has_unverified_phases" = true ]; }; then
           suggest "/vbw:verify -- Walk through changes before continuing"
         fi
         if [ "$all_done" = true ]; then
@@ -527,8 +530,11 @@ case "$CMD" in
   qa)
     case "$effective_result" in
       pass)
-        # Suggest UAT for cautious/standard autonomy when no UAT exists, or always when auto_uat=true
-        if [ "$has_uat" = false ] && { [ "$cfg_auto_uat" = true ] || [ "$cfg_autonomy" = "cautious" ] || [ "$cfg_autonomy" = "standard" ]; }; then
+        # Suggest UAT verification when:
+        # 1. Active phase has no UAT AND (auto_uat or cautious/standard autonomy)
+        # 2. auto_uat=true AND some completed phase is unverified (cross-phase)
+        if { [ "$has_uat" = false ] && { [ "$cfg_auto_uat" = true ] || [ "$cfg_autonomy" = "cautious" ] || [ "$cfg_autonomy" = "standard" ]; }; } \
+           || { [ "$cfg_auto_uat" = true ] && [ "$has_unverified_phases" = true ]; }; then
           suggest "/vbw:verify -- Walk through changes manually"
         fi
         if [ "$all_done" = true ]; then
@@ -547,7 +553,7 @@ case "$CMD" in
           else
             suggest "/vbw:fix -- Fix minor UAT issues in $current_uat_issues_label"
           fi
-        else
+        elif { [ -n "${next_unbuilt:-}" ] || [ -n "${next_unplanned:-}" ]; } && ! { [ "$cfg_auto_uat" = true ] && [ "$has_unverified_phases" = true ]; }; then
           target="${next_unbuilt:-$next_unplanned}"
           if [ -n "$next_undiscussed" ] && [ -n "$target" ] && [ "$next_undiscussed" = "$target" ]; then
             suggest "/vbw:discuss $target -- Discuss phase before planning"

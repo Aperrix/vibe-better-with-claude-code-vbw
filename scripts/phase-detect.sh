@@ -379,9 +379,11 @@ fi
 
 # --- Unverified phases detection (for auto_uat routing) ---
 # A phase is "unverified" if it is fully built (summaries >= plans, plans > 0)
-# but has no UAT.md (excluding SOURCE-UAT.md which are verbatim copies from
-# milestone remediation). Scan runs regardless of NEXT_PHASE_STATE so auto_uat
-# can trigger mid-milestone (not only at all_done).
+# but has no completed UAT.md (excluding SOURCE-UAT.md which are verbatim copies
+# from milestone remediation). A UAT with a non-terminal status (e.g. draft,
+# in_progress) is treated as unverified. Terminal statuses: complete, passed,
+# issues_found. Scan runs regardless of NEXT_PHASE_STATE so auto_uat can trigger
+# mid-milestone (not only at all_done).
 HAS_UNVERIFIED_PHASES=false
 if [ ${#PHASE_DIRS[@]} -gt 0 ]; then
   for _uv_dir in ${PHASE_DIRS[@]+"${PHASE_DIRS[@]}"}; do
@@ -396,6 +398,15 @@ if [ ${#PHASE_DIRS[@]} -gt 0 ]; then
       HAS_UNVERIFIED_PHASES=true
       break
     fi
+    # UAT file exists — check if it has a terminal status
+    _uv_uat_status=$(extract_status_value "$_uv_uat")
+    case "$_uv_uat_status" in
+      complete|passed|issues_found) ;;  # terminal — phase is verified
+      *)
+        HAS_UNVERIFIED_PHASES=true
+        break
+        ;;
+    esac
   done
 fi
 
