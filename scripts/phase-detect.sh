@@ -100,6 +100,8 @@ else
   echo "config_require_phase_discussion=false"
   echo "config_auto_uat=false"
   echo "has_unverified_phases=false"
+  echo "first_unverified_phase="
+  echo "first_unverified_slug="
   echo "has_codebase_map=false"
   echo "brownfield=false"
   echo "execution_state=none"
@@ -305,7 +307,16 @@ if [ -d "$PHASES_DIR" ]; then
         TARGET_DIR="$PHASES_DIR/$UAT_ISSUES_SLUG/"
         NEXT_PHASE="$UAT_ISSUES_PHASE"
         NEXT_PHASE_SLUG="$UAT_ISSUES_SLUG"
-        NEXT_PHASE_STATE="needs_uat_remediation"
+        # Check if remediation is complete (stage=done) → needs re-verification
+        _rem_stage="none"
+        if [ -f "${TARGET_DIR}.uat-remediation-stage" ]; then
+          _rem_stage=$(tr -d '[:space:]' < "${TARGET_DIR}.uat-remediation-stage")
+        fi
+        if [ "$_rem_stage" = "done" ]; then
+          NEXT_PHASE_STATE="needs_reverification"
+        else
+          NEXT_PHASE_STATE="needs_uat_remediation"
+        fi
         NEXT_PHASE_PLANS=$(find "$TARGET_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-PLAN.md' 2>/dev/null | wc -l | tr -d ' ')
         NEXT_PHASE_SUMMARIES=$(find "$TARGET_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-SUMMARY.md' 2>/dev/null | wc -l | tr -d ' ')
       fi
@@ -385,6 +396,8 @@ fi
 # issues_found. Scan runs regardless of NEXT_PHASE_STATE so auto_uat can trigger
 # mid-milestone (not only at all_done).
 HAS_UNVERIFIED_PHASES=false
+FIRST_UNVERIFIED_PHASE=""
+FIRST_UNVERIFIED_SLUG=""
 if [ ${#PHASE_DIRS[@]} -gt 0 ]; then
   for _uv_dir in ${PHASE_DIRS[@]+"${PHASE_DIRS[@]}"}; do
     [ -d "$_uv_dir" ] || continue
@@ -394,19 +407,26 @@ if [ ${#PHASE_DIRS[@]} -gt 0 ]; then
     _uv_sums=$(find "$_uv_dir" -maxdepth 1 -name '[0-9]*-SUMMARY.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
     [ "$_uv_sums" -ge "$_uv_plans" ] || continue
     _uv_uat=$(latest_non_source_uat "$_uv_dir")
+    _uv_is_unverified=false
     if [ -z "$_uv_uat" ]; then
+      _uv_is_unverified=true
+    else
+      # UAT file exists — check if it has a terminal status
+      _uv_uat_status=$(extract_status_value "$_uv_uat")
+      case "$_uv_uat_status" in
+        complete|passed|issues_found) ;;  # terminal — phase is verified
+        *) _uv_is_unverified=true ;;
+      esac
+    fi
+    if [ "$_uv_is_unverified" = true ]; then
       HAS_UNVERIFIED_PHASES=true
+      if [ -z "$FIRST_UNVERIFIED_PHASE" ]; then
+        _uv_dirname=$(basename "$_uv_dir")
+        FIRST_UNVERIFIED_PHASE=$(echo "$_uv_dirname" | sed 's/^\([0-9]*\).*/\1/')
+        FIRST_UNVERIFIED_SLUG="$_uv_dirname"
+      fi
       break
     fi
-    # UAT file exists — check if it has a terminal status
-    _uv_uat_status=$(extract_status_value "$_uv_uat")
-    case "$_uv_uat_status" in
-      complete|passed|issues_found) ;;  # terminal — phase is verified
-      *)
-        HAS_UNVERIFIED_PHASES=true
-        break
-        ;;
-    esac
   done
 fi
 
@@ -417,6 +437,8 @@ echo "next_phase_state=$NEXT_PHASE_STATE"
 echo "next_phase_plans=$NEXT_PHASE_PLANS"
 echo "next_phase_summaries=$NEXT_PHASE_SUMMARIES"
 echo "has_unverified_phases=$HAS_UNVERIFIED_PHASES"
+echo "first_unverified_phase=$FIRST_UNVERIFIED_PHASE"
+echo "first_unverified_slug=$FIRST_UNVERIFIED_SLUG"
 echo "uat_issues_phase=$UAT_ISSUES_PHASE"
 echo "uat_issues_slug=$UAT_ISSUES_SLUG"
 echo "uat_issues_major_or_higher=$UAT_ISSUES_MAJOR_OR_HIGHER"
