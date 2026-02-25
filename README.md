@@ -354,13 +354,7 @@ Yes, the same command again. When Phase 1 finishes, run it again for Phase 2. An
 
 When all phases are built, archive the work. VBW runs a completion audit, archives state to `.vbw-planning/milestones/`, tags the git release, and updates project docs. In hook-enabled/archive-flow execution, unresolved UAT is script-blocked (active or milestone) and is not bypassed by `--skip-audit`/`--force`. You shipped. With actual verification. Your future self won't want to set the codebase on fire. Probably.
 
-```text
-/vbw:release
-```
-
-Ready to publish? This runs a pre-release audit first — checking that your changelog covers all commits since the last release and that README counts aren't stale. If anything's missing, it offers to generate entries for your review. Then it bumps the version, finalizes the changelog, creates an annotated git tag, commits, pushes, and creates a GitHub release with the changelog notes. Supports `--dry-run` to preview, `--skip-audit` to bypass the audit, `--major` or `--minor` for non-patch bumps.
-
-That's it. `init` → `vibe` (repeat) → `vibe --archive` → `release`. Three commands for an entire development lifecycle.
+That's it. `init` → `vibe` (repeat) → `vibe --archive`. Two commands for an entire development lifecycle.
 
 ### Picking up an existing codebase
 
@@ -372,7 +366,7 @@ Same flow, one difference:
 
 VBW detects the existing codebase and auto-chains everything: `/vbw:map` launches 4 Scout teammates to analyze your code across tech stack, architecture, quality, and concerns. Skill suggestions are based on what's actually in your codebase, not just which manifest files exist. Then `/vbw:vibe` runs automatically with full codebase awareness. One command, four workflows, zero manual sequencing.
 
-From there, it's the same loop: `/vbw:vibe` until done, `/vbw:vibe --archive`, `/vbw:release`.
+From there, it's the same loop: `/vbw:vibe` until done, `/vbw:vibe --archive`.
 
 ### Coming back to a project
 
@@ -404,7 +398,6 @@ These are the commands you'll use every day. This is the job now.
 | :--- | :--- |
 | `/vbw:init` | Set up environment and scaffold `.vbw-planning/` directory with templates and config. Configures Agent Teams and statusline. Automatically installs git hooks (pre-push version enforcement). For existing codebases, maps the codebase first, then uses the map data to inform stack detection and skill suggestions before auto-chaining to `/vbw:vibe`. |
 | `/vbw:vibe [intent or flags]` | The one command. Auto-detects project state, parses natural language intent, or accepts explicit flags. 13 modes: bootstrap, scope, discuss, assumptions, **UAT remediation**, **milestone UAT recovery**, plan, execute, add/insert/remove phase, archive. Discussion mode uses the unified discussion engine (auto-calibrates Builder/Architect, generates phase-specific gray areas). If a phase has unresolved UAT issues (`status: issues_found`), plain `/vbw:vibe` automatically loads `{phase}-UAT.md` and continues remediation without requiring `--discuss` or `--plan`—major/critical issues auto-chain **discuss → plan → execute**; minor-only issues use quick-fix remediation. Milestone recovery scans archived milestones deterministically (including legacy milestones missing `SHIPPED.md`) and surfaces unresolved UAT for recovery. Archive mode includes a 7-point audit plus a script-level UAT guard in the archive flow/hook path — unresolved UAT issues block archiving and are not bypassed by `--skip-audit`/`--force`. Flags: `--plan`, `--execute`, `--discuss`, `--assumptions`, `--scope`, `--add`, `--insert`, `--remove`, `--archive`, `--yolo`, `--effort`, `--skip-qa`, `--skip-audit`. Phase numbers optional -- auto-detected when omitted. |
-| `/vbw:release` | Bump version, finalize changelog, tag, commit, push, and create a GitHub release. Runs a pre-release audit that checks changelog completeness against commits since last release and detects stale README counts, offering to fix issues before shipping. Runs `bump-version.sh` across all 4 version files, renames `[Unreleased]` to the new version in CHANGELOG.md, creates an annotated git tag, pushes, and creates a GitHub release with changelog notes via `gh`. Supports `--dry-run`, `--no-push`, `--major`, `--minor`, `--skip-audit`. |
 
 ### Monitoring -- Trust But Verify
 

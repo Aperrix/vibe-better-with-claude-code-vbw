@@ -41,7 +41,9 @@ extract_frontmatter() {
 
 echo "=== Command Contract Verification ==="
 
-for file in "$COMMANDS_DIR"/*.md; do
+# Scan both commands/ (consumer-facing) and internal/ (maintainer-only)
+for file in "$COMMANDS_DIR"/*.md "$ROOT/internal"/*.md; do
+  [ -f "$file" ] || continue
   base="$(basename "$file" .md)"
 
   if [ "$(head -1 "$file" 2>/dev/null || true)" != "---" ]; then
@@ -102,7 +104,8 @@ echo "=== Milestone Context Verification ==="
 # 1. The ACTIVE milestone shell interpolation in their Context section, OR
 # 2. Bash in allowed-tools (so the agent can read ACTIVE at runtime)
 # Without either, the agent has no way to discover the active milestone slug.
-for file in "$COMMANDS_DIR"/*.md; do
+for file in "$COMMANDS_DIR"/*.md "$ROOT/internal"/*.md; do
+  [ -f "$file" ] || continue
   base="$(basename "$file" .md)"
 
   # Extract body after frontmatter, excluding Context section (which contains the fix itself)
@@ -192,7 +195,7 @@ while IFS= read -r ref; do
   else
     fail "reference missing target: $ref -> $rel"
   fi
-done < <(grep -RhoE '\$\{CLAUDE_PLUGIN_ROOT\}/[A-Za-z0-9._/*{}-]+' "$COMMANDS_DIR"/*.md | sort -u)
+done < <(grep -RhoE '\$\{CLAUDE_PLUGIN_ROOT\}/[A-Za-z0-9._/*{}-]+' "$COMMANDS_DIR"/*.md "$ROOT/internal"/*.md 2>/dev/null | sort -u)
 
 echo ""
 echo "==============================="

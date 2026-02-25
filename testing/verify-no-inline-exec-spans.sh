@@ -51,8 +51,8 @@ is_known_unfixed() {
 
 echo "=== Inline Execution Span Verification (Issue #157) ==="
 
-# Scan all command and reference files
-for dir in "$ROOT/commands" "$ROOT/references"; do
+# Scan all command, reference, and internal files
+for dir in "$ROOT/commands" "$ROOT/references" "$ROOT/internal"; do
   [ -d "$dir" ] || continue
   dir_label="$(basename "$dir")"
 

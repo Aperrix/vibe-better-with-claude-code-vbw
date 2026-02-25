@@ -48,7 +48,7 @@ Check all `scripts/*.sh` files. WARN if any lack execute permission.
 
 ### 9. gh CLI available
 `gh --version 2>/dev/null || echo "MISSING"`
-WARN if missing: "Install gh for /vbw:release GitHub integration."
+WARN if missing: "Install gh for GitHub CLI integration (used by maintainer release tooling)."
 
 ### 10. sort -V support
 `echo -e "1.0.2\n1.0.10" | sort -V 2>/dev/null | tail -1`
