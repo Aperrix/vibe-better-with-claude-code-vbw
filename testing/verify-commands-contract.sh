@@ -43,6 +43,7 @@ echo "=== Command Contract Verification ==="
 
 # Scan both commands/ (consumer-facing) and internal/ (maintainer-only)
 for file in "$COMMANDS_DIR"/*.md "$ROOT/internal"/*.md; do
+  [ -f "$file" ] || continue
   base="$(basename "$file" .md)"
 
   if [ "$(head -1 "$file" 2>/dev/null || true)" != "---" ]; then
