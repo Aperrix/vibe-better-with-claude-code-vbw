@@ -83,7 +83,7 @@ When `require_phase_discussion=true` in config, the lifecycle command (`/vbw:vib
 Always announce the auto-detected phase before proceeding. Format:
 
 ```
-Auto-detected Phase {N} ({slug}) -- {reason}
+Auto-detected Phase {NN} ({slug}) -- {reason}
 ```
 
 Reasons by command type:

@@ -41,8 +41,8 @@ Phase state:
 
 ## Guard
 - Not initialized (no .vbw-planning/ dir): STOP "Run /vbw:init first."
-- **Auto-detect phase** (no explicit number): Phase detection is pre-computed in Context above. Use `next_phase` and `next_phase_slug` for the target phase. To find the first phase needing QA: scan phase dirs for first with `*-SUMMARY.md` but no `*-VERIFICATION.md` (phase-detect.sh provides the base phase state; QA-specific detection requires this additional check). Found: announce "Auto-detected Phase {N} ({slug})". All verified: STOP "All phases verified. Specify: `/vbw:qa N`"
-- Phase not built (no SUMMARYs): STOP "Phase {N} has no completed plans. Run /vbw:vibe first."
+- **Auto-detect phase** (no explicit number): Phase detection is pre-computed in Context above. Use `next_phase` and `next_phase_slug` for the target phase. To find the first phase needing QA: scan phase dirs for first with `*-SUMMARY.md` but no `*-VERIFICATION.md` (phase-detect.sh provides the base phase state; QA-specific detection requires this additional check). Found: announce "Auto-detected Phase {NN} ({slug})". All verified: STOP "All phases verified. Specify: `/vbw:qa {NN}`"
+- Phase not built (no SUMMARYs): STOP "Phase {NN} has no completed plans. Run /vbw:vibe first."
 
 Note: Continuous verification handled by hooks. This command is for deep, on-demand verification only.
 
@@ -72,7 +72,7 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
       `maxTurns: ${QA_MAX_TURNS}` parameters.**
 
         ```text
-        Verify phase {N}. Tier: {ACTIVE_TIER}.
+        Verify phase {NN}. Tier: {ACTIVE_TIER}.
         Plans: {paths to PLAN.md files}
         Summaries: {paths to SUMMARY.md files}
         Phase success criteria: {section from ROADMAP.md}
@@ -98,7 +98,7 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
 1. **Present:** Per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md:
     ```text
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    Phase {N}: {name} -- Verified
+    Phase {NN}: {name} -- Verified
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
       Tier:     {quick|standard|deep}
@@ -110,7 +110,7 @@ Note: Continuous verification handled by hooks. This command is for deep, on-dem
 
     ```
 
-**Discovered Issues:** If the QA agent reported pre-existing failures, out-of-scope bugs, or issues unrelated to this phase's work, de-duplicate by test name and file (keep first error message when the same test+file pair has different messages) and append after the result box. Cap the list at 20 entries; if more exist, show the first 20 and append `... and {N} more`:
+**Discovered Issues:** If the QA agent reported pre-existing failures, out-of-scope bugs, or issues unrelated to this phase's work, de-duplicate by test name and file (keep first error message when the same test+file pair has different messages) and append after the result box. Cap the list at 20 entries; if more exist, show the first 20 and append `... and {NN} more`:
 ```text
   Discovered Issues:
     ⚠ testName (path/to/file): error message

@@ -51,12 +51,12 @@ Pre-computed UAT resume metadata:
 ## Guard
 
 - Not initialized (no .vbw-planning/ dir): STOP "Run /vbw:init first."
-- No SUMMARY.md in phase dir: STOP "Phase {N} has no completed plans. Run /vbw:vibe first."
+- No SUMMARY.md in phase dir: STOP "Phase {NN} has no completed plans. Run /vbw:vibe first."
 - **Auto-detect phase** (no explicit number): Phase detection is pre-computed in Context above. Use `next_phase` and `next_phase_slug` for the target phase.
   - If `next_phase_state=needs_reverification`: use `next_phase` directly — this is the phase that just completed remediation and needs re-verification.
   - If `first_unverified_phase` is set: use that phase directly — this is the first fully-built phase without a terminal UAT.
   - Fallback: scan phase dirs for first with `*-SUMMARY.md` but no canonical `*-UAT.md` (exclude `*-SOURCE-UAT.md` copies).
-  - Found: announce "Auto-detected Phase {N} ({slug})". All verified: STOP "All phases have UAT results. Specify: `/vbw:verify N`"
+  - Found: announce "Auto-detected Phase {NN} ({slug})". All verified: STOP "All phases have UAT results. Specify: `/vbw:verify {NN}`"
 
 ## Steps
 
@@ -90,7 +90,7 @@ For each plan in the pre-computed verify context block:
 - Use the pre-computed `what_was_built`, `files_modified`, and `must_haves` data. Do NOT read SUMMARY.md or PLAN.md files.
 - Generate 1-3 test scenarios that require HUMAN judgment — things only a person can verify
 - Minimum 1 test per plan, even for pure refactors (use "verify nothing broke" regression test)
-- Test IDs follow the format: `P{plan}-T{N}` (e.g., P01-T1, P01-T2, P02-T1)
+- Test IDs follow the format: `P{plan}-T{NN}` (e.g., P01-T1, P01-T2, P02-T1)
 
 **UAT tests must be things only a human can judge.** Good examples:
 - Open the app and navigate to screen X — does it display Y correctly?
@@ -117,7 +117,7 @@ For the FIRST test without a result, display a CHECKPOINT followed by AskUserQue
 
 ```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  CHECKPOINT {N}/{total} — {plan-id}: {plan-title}
+  CHECKPOINT {NN}/{total} — {plan-id}: {plan-title}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 {scenario description}
@@ -197,7 +197,7 @@ Issue recorded (severity: {level}). Final next-step routing shown at UAT summary
 
 When a user passes or skips a test but also mentions a separate bug, issue, or observation unrelated to the test's expected behavior, capture it as a **discovered issue**.
 
-Assign a discovered-issue ID: `D{N}` (D01, D02, ...) — sequential across the UAT session. **On resumed sessions:** scan existing `D{N}` entries in the UAT.md to find the highest existing number, then continue from max+1 (e.g., if D01 and D02 exist, the next discovered issue is D03).
+Assign a discovered-issue ID: `D{NN}` (D01, D02, ...) — sequential across the UAT session. **On resumed sessions:** scan existing `D{NN}` entries in the UAT.md to find the highest existing number, then continue from max+1 (e.g., if D01 and D02 exist, the next discovered issue is D03).
 
 Infer severity using the same keyword table from Step 6. Infer category from context:
 - If the user identifies a specific view/screen/component: use that as the description prefix
@@ -206,7 +206,7 @@ Infer severity using the same keyword table from Step 6. Infer category from con
 Append a new test entry to the UAT.md `## Tests` section:
 
 ```markdown
-### D{N}: {short-title}
+### D{NN}: {short-title}
 
 - **Plan:** (discovered during {test-id})
 - **Scenario:** User observation during UAT
@@ -221,7 +221,7 @@ Increment `total_tests` and `issues` in frontmatter. This ensures discovered iss
 
 Display:
 ```text
-Discovered issue D{N} recorded (severity: {level}).
+Discovered issue D{NN} recorded (severity: {level}).
 ```
 
 ### 8. After each response: persist immediately
@@ -237,18 +237,18 @@ Discovered issue D{N} recorded (severity: {level}).
 
 ```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Phase {N}: {name} — UAT Complete
+  Phase {NN}: {name} — UAT Complete
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Result:   {✓ PASS | ✗ ISSUES FOUND}
-  Passed:   {N}
-  Skipped:  {N}
-  Issues:   {N}
+  Passed:   {NN}
+  Skipped:  {NN}
+  Issues:   {NN}
 
   Report:   {path to UAT.md}
 ```
 
-**Discovered Issues in summary:** If any discovered issues (`D{N}` entries) were recorded during the session, list them after the result box so the user sees them at a glance:
+**Discovered Issues in summary:** If any discovered issues (`D{NN}` entries) were recorded during the session, list them after the result box so the user sees them at a glance:
 ```text
   Discovered Issues:
     ⚠ D01: {short-title} (severity: {level})
@@ -266,7 +266,7 @@ These are already recorded in the UAT.md and will flow into remediation alongsid
 ```bash
 PG_SCRIPT="/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/planning-git.sh"
 if [ -f "$PG_SCRIPT" ]; then
-  bash "$PG_SCRIPT" commit-boundary "verify phase {N}" .vbw-planning/config.json
+  bash "$PG_SCRIPT" commit-boundary "verify phase {NN}" .vbw-planning/config.json
 else
   echo "VBW: planning-git.sh unavailable; skipping planning git boundary commit" >&2
 fi

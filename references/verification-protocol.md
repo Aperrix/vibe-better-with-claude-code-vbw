@@ -114,9 +114,9 @@ Protocol instructions in agent definitions (not JS hooks or event handlers).
 phase: {phase-id}
 tier: {quick|standard|deep}
 result: {PASS|FAIL|PARTIAL}
-passed: {N}
-failed: {N}
-total: {N}
+passed: {NN}
+failed: {NN}
+total: {NN}
 date: {YYYY-MM-DD}
 ---
 ```
@@ -133,7 +133,7 @@ Check tables use **5-column** or **6-column** format depending on category-speci
 - Convention: `# | ID | Convention | File | Status | Detail`
 
 ```markdown
-# Verification: Phase {N}
+# Verification: Phase {NN}
 ## Must-Have Checks
 | # | ID | Truth/Condition | Status | Evidence |
 ## Artifact Checks
