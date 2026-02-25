@@ -190,13 +190,13 @@ else
   fail "blocks SUMMARY-01.Md — got rc=$RC, output: $OUTPUT"
 fi
 
-# Test 16: normalize handles uppercase PLAN-01.MD
+# Test 16: normalize handles uppercase PLAN-01.MD (normalizes extension to lowercase)
 TDIR="$TMPDIR_TEST/test16"
 mkdir -p "$TDIR"
 echo "plan" > "$TDIR/PLAN-01.MD"
 OUTPUT=$(bash "$NORM_SCRIPT" "$TDIR" 2>&1) && RC=$? || RC=$?
-if [ "$RC" -eq 0 ] && [ -f "$TDIR/01-PLAN.MD" ]; then
-  pass "renames PLAN-01.MD → 01-PLAN.MD (preserves extension case)"
+if [ "$RC" -eq 0 ] && [ -f "$TDIR/01-PLAN.md" ]; then
+  pass "renames PLAN-01.MD → 01-PLAN.md (normalizes extension to lowercase)"
 else
   fail "uppercase rename — rc=$RC, files: $(ls "$TDIR"), output: $OUTPUT"
 fi
@@ -214,6 +214,69 @@ if echo "$OUTPUT" | grep -q "misnamed_plans=true"; then
   pass "phase-detect catches uppercase PLAN-01.MD"
 else
   fail "phase-detect uppercase — output missing misnamed_plans=true"
+fi
+
+# --- PLAN-NN-CONTEXT compound form test ---
+echo ""
+echo "Compound form handling:"
+
+# Test 18: normalize handles PLAN-01-CONTEXT.md → 01-CONTEXT.md
+TDIR="$TMPDIR_TEST/test18"
+mkdir -p "$TDIR"
+echo "context" > "$TDIR/PLAN-01-CONTEXT.md"
+OUTPUT=$(bash "$NORM_SCRIPT" "$TDIR" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 0 ] && [ -f "$TDIR/01-CONTEXT.md" ] && [ ! -f "$TDIR/01-PLAN.md" ]; then
+  pass "renames PLAN-01-CONTEXT.md → 01-CONTEXT.md (not 01-PLAN.md)"
+else
+  fail "PLAN-NN-CONTEXT compound — rc=$RC, files: $(ls "$TDIR"), output: $OUTPUT"
+fi
+
+# Test 19: normalize handles PLAN-02-SUMMARY.md alongside PLAN-02-CONTEXT.md
+TDIR="$TMPDIR_TEST/test19"
+mkdir -p "$TDIR"
+echo "summary" > "$TDIR/PLAN-02-SUMMARY.md"
+echo "context" > "$TDIR/PLAN-02-CONTEXT.md"
+OUTPUT=$(bash "$NORM_SCRIPT" "$TDIR" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 0 ] && [ -f "$TDIR/02-SUMMARY.md" ] && [ -f "$TDIR/02-CONTEXT.md" ] && [ ! -f "$TDIR/02-PLAN.md" ]; then
+  pass "renames both PLAN-02-SUMMARY.md and PLAN-02-CONTEXT.md correctly"
+else
+  fail "compound pair — rc=$RC, files: $(ls "$TDIR"), output: $OUTPUT"
+fi
+
+# --- file-guard precision tests ---
+echo ""
+echo "File-guard precision (false-positive prevention):"
+
+# Test 20: file-guard allows plan-01-review.md (arbitrary name, not a plan)
+OUTPUT=$(echo '{"tool_input":{"file_path":".vbw-planning/phases/01-setup/plan-01-review.md"}}' | bash "$SCRIPT_DIR/scripts/file-guard.sh" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 0 ]; then
+  pass "allows plan-01-review.md (not a type-first pattern)"
+else
+  fail "plan-01-review.md — got rc=$RC, output: $OUTPUT"
+fi
+
+# Test 21: file-guard allows summary-1custom.md (digits followed by letters)
+OUTPUT=$(echo '{"tool_input":{"file_path":".vbw-planning/phases/01-setup/summary-1custom.md"}}' | bash "$SCRIPT_DIR/scripts/file-guard.sh" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 0 ]; then
+  pass "allows summary-1custom.md (not a strict type-first pattern)"
+else
+  fail "summary-1custom.md — got rc=$RC, output: $OUTPUT"
+fi
+
+# Test 22: file-guard still blocks PLAN-01-SUMMARY.md (compound type-first)
+OUTPUT=$(echo '{"tool_input":{"file_path":".vbw-planning/phases/01-setup/PLAN-01-SUMMARY.md"}}' | bash "$SCRIPT_DIR/scripts/file-guard.sh" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 2 ] && echo "$OUTPUT" | grep -q "wrong naming convention"; then
+  pass "blocks PLAN-01-SUMMARY.md (compound type-first)"
+else
+  fail "PLAN-01-SUMMARY.md — got rc=$RC, output: $OUTPUT"
+fi
+
+# Test 23: file-guard still blocks PLAN-01-CONTEXT.md (compound type-first)
+OUTPUT=$(echo '{"tool_input":{"file_path":".vbw-planning/phases/01-setup/PLAN-01-CONTEXT.md"}}' | bash "$SCRIPT_DIR/scripts/file-guard.sh" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 2 ] && echo "$OUTPUT" | grep -q "wrong naming convention"; then
+  pass "blocks PLAN-01-CONTEXT.md (compound type-first)"
+else
+  fail "PLAN-01-CONTEXT.md — got rc=$RC, output: $OUTPUT"
 fi
 
 echo ""

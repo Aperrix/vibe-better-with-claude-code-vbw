@@ -33,6 +33,9 @@ for f in "$PHASE_DIR"/PLAN-[0-9]*.[mM][dD]; do
   if echo "$BASENAME" | grep -qi '^PLAN-[0-9]*-SUMMARY\.[mM][dD]$'; then
     # PLAN-NN-SUMMARY.md → NN-SUMMARY.md
     TARGET="$PHASE_DIR/${NUM}-SUMMARY.md"
+  elif echo "$BASENAME" | grep -qi '^PLAN-[0-9]*-CONTEXT\.[mM][dD]$'; then
+    # PLAN-NN-CONTEXT.md → NN-CONTEXT.md
+    TARGET="$PHASE_DIR/${NUM}-CONTEXT.md"
   else
     # PLAN-NN.md → NN-PLAN.md
     TARGET="$PHASE_DIR/${NUM}-PLAN.md"

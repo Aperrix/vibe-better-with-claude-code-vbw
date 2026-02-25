@@ -24,8 +24,14 @@ FILE_PATH_LC=$(echo "$FILE_PATH" | tr '[:upper:]' '[:lower:]')
 case "$FILE_PATH_LC" in
   *.vbw-planning/phases/*/plan-[0-9]*.md|*.vbw-planning/phases/*/summary-[0-9]*.md|*.vbw-planning/phases/*/context-[0-9]*.md)
     _BASENAME_CHECK=$(basename "$FILE_PATH" 2>/dev/null) || _BASENAME_CHECK="$FILE_PATH"
-    echo "Blocked: wrong naming convention. Use {NN}-PLAN.md (e.g., 01-PLAN.md), not PLAN-{NN}.md ($_BASENAME_CHECK)" >&2
-    exit 2
+    _BASENAME_LC=$(echo "$_BASENAME_CHECK" | tr '[:upper:]' '[:lower:]')
+    # Only block exact type-first patterns (type-NN.md) and known compounds (plan-NN-summary.md, plan-NN-context.md).
+    # Allow arbitrary filenames like plan-01-review.md through.
+    if echo "$_BASENAME_LC" | grep -qE '^(plan|summary|context)-[0-9]+\.md$' || \
+       echo "$_BASENAME_LC" | grep -qE '^plan-[0-9]+-(summary|context)\.md$'; then
+      echo "Blocked: wrong naming convention. Use {NN}-PLAN.md (e.g., 01-PLAN.md), not PLAN-{NN}.md ($_BASENAME_CHECK)" >&2
+      exit 2
+    fi
     ;;
 esac
 
