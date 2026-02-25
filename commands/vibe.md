@@ -255,15 +255,17 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
    ```bash
    STAGE=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh get "$PHASE_DIR")
    ```
-   - If `STAGE=none`: initialize based on severity:
+   - If `STAGE=none`: initialize based on severity. **Run directly (do NOT capture with `$()`)** — the init output contains both the stage and the pre-seeded CONTEXT.md content:
      ```bash
-     STAGE=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh init "$PHASE_DIR" "major")
+     bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh init "$PHASE_DIR" "major"
      # or "minor" when uat_issues_major_or_higher=false
      ```
+     The first line of output is the stage (`plan` or `fix`). After the `---CONTEXT---` separator, the full pre-seeded CONTEXT.md content follows — **use this directly as your remediation context. Do NOT separately read UAT.md or CONTEXT.md files.**
    - If `STAGE=done`: UAT remediation already completed for this phase. Display "Remediation already completed. Run `/vbw:verify --resume` to re-test." STOP.
    - Otherwise: resume at the persisted stage (handles compaction recovery).
 5. **Execute the current stage** based on `STAGE`:
-   - `plan`: Execute **Plan mode steps 1-11 above** for the same phase. The UAT report serves as the scoping document — no separate discussion is needed (CONTEXT.md is already pre-seeded with UAT data by `init`). **Scout context (CRITICAL):** When Plan mode step 3 spawns Scout, include the pre-computed UAT issue lines (`ID|SEVERITY|DESCRIPTION` from step 2) in Scout's task prompt so Scout knows what codebase areas to investigate for each issue. Without this, Scout searches blind. After planning completes, advance:
+   **File read prohibition:** Do NOT read `{phase}-UAT.md` or `{phase}-CONTEXT.md` — all UAT data is already available from step 2 (pre-computed issue lines) and step 4 (CONTEXT.md content emitted by `init`). Reading these files wastes tool calls.
+   - `plan`: Execute **Plan mode steps 1-11 above** for the same phase. The UAT report serves as the scoping document — no separate discussion is needed (CONTEXT.md content was emitted by `init` in step 4). **Scout context (CRITICAL):** When Plan mode step 3 spawns Scout, include the pre-computed UAT issue lines (`ID|SEVERITY|DESCRIPTION` from step 2) in Scout's task prompt so Scout knows what codebase areas to investigate for each issue. Without this, Scout searches blind. After planning completes, advance:
      ```bash
      bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh advance "$PHASE_DIR"
      ```

@@ -131,6 +131,7 @@ case "$CMD" in
       uat_file=$(find "$PHASE_DIR" -maxdepth 1 ! -name '.*' -name '[0-9]*-UAT.md' ! -name '*SOURCE-UAT.md' 2>/dev/null | sort | tail -1)
     fi
 
+    _emit_context=false
     if [ -n "$uat_file" ] && [ -f "$uat_file" ]; then
       uat_content=$(cat "$uat_file")
 
@@ -157,6 +158,7 @@ case "$CMD" in
             echo ""
             printf '%s\n' "$uat_content"
           } >> "$context_file"
+          _emit_context=true
         else
           # Not yet pre-seeded — update frontmatter and append UAT content
           if head -1 "$context_file" | grep -q '^---[[:space:]]*$'; then
@@ -186,6 +188,7 @@ case "$CMD" in
             echo ""
             printf '%s\n' "$uat_content"
           } >> "$context_file"
+          _emit_context=true
         fi
       else
         # No CONTEXT.md yet — create one with UAT content
@@ -204,7 +207,15 @@ case "$CMD" in
           echo ""
           printf '%s\n' "$uat_content"
         } > "$context_file"
+        _emit_context=true
       fi
+    fi
+
+    # Emit CONTEXT.md content so the model has it without a separate file read.
+    # Output format: line 1 = stage word (already emitted above), then separator + content.
+    if [ "$_emit_context" = true ] && [ -n "$context_file" ] && [ -f "$context_file" ]; then
+      echo "---CONTEXT---"
+      cat "$context_file"
     fi
     ;;
 
