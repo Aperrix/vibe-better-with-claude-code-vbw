@@ -97,6 +97,18 @@ If no $ARGUMENTS, evaluate phase-detect.sh output. First match determines mode:
 "⚠ Phase detection failed. Run `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/phase-detect.sh` manually to debug."
 STOP. Do NOT manually scan for project state or improvise routing — incorrect routing can corrupt archived milestones.
 
+**Misnamed plan auto-repair:** If the output contains `misnamed_plans=true`, normalize all phase directories before routing:
+```bash
+NORM_SCRIPT="/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/normalize-plan-filenames.sh"
+if [ -f "$NORM_SCRIPT" ]; then
+  for pdir in .vbw-planning/phases/*/; do
+    [ -d "$pdir" ] && bash "$NORM_SCRIPT" "$pdir"
+  done
+fi
+```
+Display: "⚠ Renamed misnamed plan files to `{NN}-PLAN.md` convention."
+Then re-run phase-detect.sh and use updated output for routing below.
+
 | Priority | Condition | Mode | Confirmation |
 |---|---|---|---|
 | 1 | `planning_dir_exists=false` | Init redirect | (redirect, no confirmation) |

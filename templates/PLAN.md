@@ -5,7 +5,7 @@ title: {plan-title}
 type: execute
 wave: {wave-number}
 depends_on: [{deps}]
-cross_phase_deps: [{phase: {N}, plan: "{NN-MM}", artifact: "{path}", reason: "{why}"}]
+cross_phase_deps: [{phase: {NN}, plan: "{NN-MM}", artifact: "{path}", reason: "{why}"}]
 autonomous: {true|false}
 effort_override: {thorough|balanced|fast|turbo}
 skills_used: [{skill}]

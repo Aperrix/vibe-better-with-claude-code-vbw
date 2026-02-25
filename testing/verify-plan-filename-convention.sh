@@ -170,6 +170,52 @@ else
   fail "phase-detect clean — output missing misnamed_plans=false"
 fi
 
+# --- Uppercase extension (.MD) tests ---
+echo ""
+echo "Uppercase extension (.MD) handling:"
+
+# Test 14: file-guard blocks uppercase PLAN-01.MD
+OUTPUT=$(echo '{"tool_input":{"file_path":".vbw-planning/phases/01-setup/PLAN-01.MD"}}' | bash "$SCRIPT_DIR/scripts/file-guard.sh" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 2 ] && echo "$OUTPUT" | grep -q "wrong naming convention"; then
+  pass "blocks PLAN-01.MD (uppercase extension)"
+else
+  fail "blocks PLAN-01.MD — got rc=$RC, output: $OUTPUT"
+fi
+
+# Test 15: file-guard blocks mixed-case SUMMARY-01.Md
+OUTPUT=$(echo '{"tool_input":{"file_path":".vbw-planning/phases/01-setup/SUMMARY-01.Md"}}' | bash "$SCRIPT_DIR/scripts/file-guard.sh" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 2 ] && echo "$OUTPUT" | grep -q "wrong naming convention"; then
+  pass "blocks SUMMARY-01.Md (mixed-case extension)"
+else
+  fail "blocks SUMMARY-01.Md — got rc=$RC, output: $OUTPUT"
+fi
+
+# Test 16: normalize handles uppercase PLAN-01.MD
+TDIR="$TMPDIR_TEST/test16"
+mkdir -p "$TDIR"
+echo "plan" > "$TDIR/PLAN-01.MD"
+OUTPUT=$(bash "$NORM_SCRIPT" "$TDIR" 2>&1) && RC=$? || RC=$?
+if [ "$RC" -eq 0 ] && [ -f "$TDIR/01-PLAN.MD" ]; then
+  pass "renames PLAN-01.MD → 01-PLAN.MD (preserves extension case)"
+else
+  fail "uppercase rename — rc=$RC, files: $(ls "$TDIR"), output: $OUTPUT"
+fi
+
+# Test 17: phase-detect catches uppercase PLAN-01.MD
+TDIR="$TMPDIR_TEST/test17"
+mkdir -p "$TDIR/.vbw-planning/phases/01-setup"
+echo "plan" > "$TDIR/.vbw-planning/phases/01-setup/PLAN-01.MD"
+cat > "$TDIR/.vbw-planning/PROJECT.md" << 'EOF'
+# Test Project
+This is a test project.
+EOF
+OUTPUT=$(cd "$TDIR" && bash "$SCRIPT_DIR/scripts/phase-detect.sh" 2>/dev/null) && RC=$? || RC=$?
+if echo "$OUTPUT" | grep -q "misnamed_plans=true"; then
+  pass "phase-detect catches uppercase PLAN-01.MD"
+else
+  fail "phase-detect uppercase — output missing misnamed_plans=true"
+fi
+
 echo ""
 echo "==============================="
 echo "Plan filename convention: $PASS passed, $FAIL failed"

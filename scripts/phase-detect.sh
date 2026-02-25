@@ -416,7 +416,7 @@ MISNAMED_PLANS=false
 if [ ${#PHASE_DIRS[@]} -gt 0 ]; then
   for _mn_dir in ${PHASE_DIRS[@]+"${PHASE_DIRS[@]}"}; do
     [ -d "$_mn_dir" ] || continue
-    if find "$_mn_dir" -maxdepth 1 \( -name 'PLAN-[0-9]*.md' -o -name 'SUMMARY-[0-9]*.md' -o -name 'CONTEXT-[0-9]*.md' \) 2>/dev/null | grep -q .; then
+    if find "$_mn_dir" -maxdepth 1 \( -iname 'PLAN-[0-9]*.md' -o -iname 'SUMMARY-[0-9]*.md' -o -iname 'CONTEXT-[0-9]*.md' \) 2>/dev/null | grep -q .; then
       MISNAMED_PLANS=true
       break
     fi

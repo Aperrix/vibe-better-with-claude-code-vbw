@@ -20,8 +20,8 @@ fi
 # Strip trailing slash for consistent path joining
 PHASE_DIR="${PHASE_DIR%/}"
 
-# Pattern: PLAN-NN.md → NN-PLAN.md
-for f in "$PHASE_DIR"/PLAN-[0-9]*.md; do
+# Pattern: PLAN-NN.md → NN-PLAN.md (case-insensitive extension)
+for f in "$PHASE_DIR"/PLAN-[0-9]*.[mM][dD]; do
   [ -f "$f" ] || continue
   BASENAME=$(basename "$f")
   # Extract number: PLAN-01.md → 01, PLAN-02-SUMMARY.md → 02
@@ -30,7 +30,7 @@ for f in "$PHASE_DIR"/PLAN-[0-9]*.md; do
   # Zero-pad to 2 digits
   NUM=$(printf "%02d" "$((10#$NUM))")
 
-  if echo "$BASENAME" | grep -q '^PLAN-[0-9]*-SUMMARY\.md$'; then
+  if echo "$BASENAME" | grep -qi '^PLAN-[0-9]*-SUMMARY\.[mM][dD]$'; then
     # PLAN-NN-SUMMARY.md → NN-SUMMARY.md
     TARGET="$PHASE_DIR/${NUM}-SUMMARY.md"
   else
@@ -46,8 +46,8 @@ for f in "$PHASE_DIR"/PLAN-[0-9]*.md; do
   echo "renamed: $BASENAME -> $(basename "$TARGET")"
 done
 
-# Pattern: SUMMARY-NN.md → NN-SUMMARY.md
-for f in "$PHASE_DIR"/SUMMARY-[0-9]*.md; do
+# Pattern: SUMMARY-NN.md → NN-SUMMARY.md (case-insensitive extension)
+for f in "$PHASE_DIR"/SUMMARY-[0-9]*.[mM][dD]; do
   [ -f "$f" ] || continue
   BASENAME=$(basename "$f")
   NUM=$(echo "$BASENAME" | sed 's/^SUMMARY-\([0-9]*\).*/\1/')
@@ -62,8 +62,8 @@ for f in "$PHASE_DIR"/SUMMARY-[0-9]*.md; do
   echo "renamed: $BASENAME -> $(basename "$TARGET")"
 done
 
-# Pattern: CONTEXT-NN.md → NN-CONTEXT.md
-for f in "$PHASE_DIR"/CONTEXT-[0-9]*.md; do
+# Pattern: CONTEXT-NN.md → NN-CONTEXT.md (case-insensitive extension)
+for f in "$PHASE_DIR"/CONTEXT-[0-9]*.[mM][dD]; do
   [ -f "$f" ] || continue
   BASENAME=$(basename "$f")
   NUM=$(echo "$BASENAME" | sed 's/^CONTEXT-\([0-9]*\).*/\1/')
