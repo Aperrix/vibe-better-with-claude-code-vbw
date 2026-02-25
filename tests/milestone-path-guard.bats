@@ -57,7 +57,10 @@ teardown() {
 EOF
   run bash "$SCRIPTS_DIR/uat-remediation-state.sh" init "$ACTIVE_PHASE" "major"
   [ "$status" -eq 0 ]
-  [ "$output" = "plan" ]
+  # First line is the stage word; subsequent lines may contain emitted CONTEXT
+  local first_line
+  first_line=$(echo "$output" | head -1)
+  [ "$first_line" = "plan" ]
 }
 
 @test "uat-remediation-state error message suggests create-remediation-phase.sh" {
@@ -77,7 +80,10 @@ EOF
 EOF
   run bash "$SCRIPTS_DIR/uat-remediation-state.sh" init "$MILESTONES_WORKSPACE/.vbw-planning/phases/01-test" "major"
   [ "$status" -eq 0 ]
-  [ "$output" = "plan" ]
+  # First line is the stage word; subsequent lines may contain emitted CONTEXT
+  local first_line
+  first_line=$(echo "$output" | head -1)
+  [ "$first_line" = "plan" ]
   rm -rf "$MILESTONES_WORKSPACE"
 }
 
