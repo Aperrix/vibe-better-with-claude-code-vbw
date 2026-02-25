@@ -84,7 +84,7 @@ ALWAYS confirm interpreted intent via AskUserQuestion before executing.
 If no $ARGUMENTS, evaluate phase-detect.sh output. First match determines mode:
 
 **Phase-detect error guard (NON-NEGOTIABLE):** If the output contains `phase_detect_error=true`, display:
-"⚠ Phase detection failed. Run `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/phase-detect.sh` manually to debug."
+"⚠ Phase detection failed. Run `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/phase-detect.sh` manually to debug."
 STOP. Do NOT manually scan for project state or improvise routing — incorrect routing can corrupt archived milestones.
 
 | Priority | Condition | Mode | Confirmation |
@@ -145,7 +145,7 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 **Steps:**
 - **B1: PROJECT.md** -- If $ARGUMENTS provided (excluding flags), use as description. Otherwise ask name + core purpose. Then call:
   ```
-  bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/bootstrap/bootstrap-project.sh .vbw-planning/PROJECT.md "$NAME" "$DESCRIPTION"
+  bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/bootstrap/bootstrap-project.sh .vbw-planning/PROJECT.md "$NAME" "$DESCRIPTION"
   ```
 - **B1.5: Discovery Depth** -- Read `discovery_questions` and `active_profile` from config. Map profile to depth:
 
@@ -161,12 +161,12 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 - **B2: REQUIREMENTS.md (Discovery)** -- Behavior depends on DISCOVERY_DEPTH:
   - **B2.1: Domain Research (if not skip):** If DISCOVERY_DEPTH != skip:
     1. Extract domain from user's project description (the $NAME or $DESCRIPTION from B1)
-   2. Resolve Scout model via `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/config/model-profiles.json` and Scout max turns via `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "$(jq -r '.effort // \"balanced\"' .vbw-planning/config.json 2>/dev/null)"`
+   2. Resolve Scout model via `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/config/model-profiles.json` and Scout max turns via `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "$(jq -r '.effort // \"balanced\"' .vbw-planning/config.json 2>/dev/null)"`
     3. Spawn Scout agent via Task tool with prompt: "Research the {domain} domain. Return your findings as structured markdown with four sections: ## Table Stakes (features every {domain} app has), ## Common Pitfalls (what projects get wrong), ## Architecture Patterns (how similar apps are structured), ## Competitor Landscape (existing products). Use WebSearch. Be concise (2-3 bullets per section). Do NOT attempt to write files — return findings in your response."
    4. Set `model: "${SCOUT_MODEL}"`, `maxTurns: ${SCOUT_MAX_TURNS}`, and `timeout: 120000` in Task tool invocation
     5. On success: Write Scout's returned findings to `.vbw-planning/domain-research.md`. Extract brief summary (3-5 lines max). Display to user: "◆ Domain Research: {brief summary}\n\n✓ Research complete. Now let's explore your specific needs..."
     6. On failure: Log warning "⚠ Domain research timed out, proceeding with general questions". Set RESEARCH_AVAILABLE=false, continue.
-  - **B2.2: Discussion Engine** -- Read ``!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/references/discussion-engine.md` and follow its protocol.
+  - **B2.2: Discussion Engine** -- Read `/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/references/discussion-engine.md` and follow its protocol.
     - Context for the engine: "This is a new project. No phases yet." Use project description + domain research (if available) as input.
     - The engine handles calibration, gray area generation, exploration, and capture.
     - Output: `discovery.json` with answered/inferred/deferred arrays.
@@ -176,28 +176,28 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
     Record answers to `.vbw-planning/discovery.json` with `{"answered":[],"inferred":[],"deferred":[]}`.
   - **After discovery (all depths):** Call:
     ```
-    bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/bootstrap/bootstrap-requirements.sh .vbw-planning/REQUIREMENTS.md .vbw-planning/discovery.json .vbw-planning/domain-research.md
+    bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/bootstrap/bootstrap-requirements.sh .vbw-planning/REQUIREMENTS.md .vbw-planning/discovery.json .vbw-planning/domain-research.md
     ```
 
 - **B3: ROADMAP.md** -- Suggest 3-5 phases from requirements. If `.vbw-planning/codebase/META.md` exists, read PATTERNS.md, ARCHITECTURE.md, and CONCERNS.md (whichever exist) from `.vbw-planning/codebase/`. Each phase: name, goal, mapped reqs, success criteria. Write phases JSON to temp file, then call:
   ```
-  bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/bootstrap/bootstrap-roadmap.sh .vbw-planning/ROADMAP.md "$PROJECT_NAME" /tmp/vbw-phases.json
+  bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/bootstrap/bootstrap-roadmap.sh .vbw-planning/ROADMAP.md "$PROJECT_NAME" /tmp/vbw-phases.json
   ```
   Script handles ROADMAP.md generation and phase directory creation.
 - **B4: STATE.md** -- Extract project name, milestone name, and phase count from earlier steps. Call:
   ```
-  bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/bootstrap/bootstrap-state.sh .vbw-planning/STATE.md "$PROJECT_NAME" "$MILESTONE_NAME" "$PHASE_COUNT"
+  bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/bootstrap/bootstrap-state.sh .vbw-planning/STATE.md "$PROJECT_NAME" "$MILESTONE_NAME" "$PHASE_COUNT"
   ```
   Script handles today's date, Phase 1 status, empty decisions, and 0% progress.
 - **B5: Brownfield summary** -- If BROWNFIELD=true AND no codebase/: count files by ext, check tests/CI/Docker/monorepo, add Codebase Profile to STATE.md.
 - **B6: CLAUDE.md** -- Extract project name and core value from PROJECT.md. If root CLAUDE.md exists, pass it as EXISTING_PATH for section preservation. Call:
   ```
-  bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/bootstrap/bootstrap-claude.sh CLAUDE.md "$PROJECT_NAME" "$CORE_VALUE" [CLAUDE.md]
+  bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/bootstrap/bootstrap-claude.sh CLAUDE.md "$PROJECT_NAME" "$CORE_VALUE" [CLAUDE.md]
   ```
   Script handles: new file generation (heading + core value + VBW sections), existing file preservation (replaces only VBW-managed sections: Active Context, VBW Rules, Installed Skills, Project Conventions, Commands, Plugin Isolation; preserves all other content). Omit the fourth argument if no existing CLAUDE.md. Max 200 lines.
 - **B7: Planning commit boundary (conditional)** -- Run:
    ```bash
-  PG_SCRIPT="`!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/planning-git.sh"
+  PG_SCRIPT="/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/planning-git.sh"
    if [ -f "$PG_SCRIPT" ]; then
      bash "$PG_SCRIPT" commit-boundary "bootstrap project files" .vbw-planning/config.json
    else
@@ -226,8 +226,8 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 
 **Steps:**
 1. Determine target phase from $ARGUMENTS or auto-detection.
-2. Read ``!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/references/discussion-engine.md` and follow its protocol for the target phase.
-3. Run `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/suggest-next.sh vibe`.
+2. Read `/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/references/discussion-engine.md` and follow its protocol for the target phase.
+3. Run `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/suggest-next.sh vibe`.
 
 ### Mode: Assumptions
 
@@ -238,13 +238,13 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 1. Load context: ROADMAP.md, REQUIREMENTS.md, PROJECT.md, STATE.md, CONTEXT.md (if exists), codebase signals.
 2. Generate 5-10 assumptions by impact: scope (included/excluded), technical (implied approaches), ordering (sequencing), dependency (prior phases), user preference (defaults without stated preference).
 3. Gather feedback per assumption: "Confirm, correct, or expand?" Confirm=proceed, Correct=user provides answer, Expand=user adds nuance.
-4. Present grouped by status (confirmed/corrected/expanded). This mode does NOT write files. For persistence: "Run `/vbw:vibe --discuss {N}` to capture as CONTEXT.md." Run `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/suggest-next.sh vibe`.
+4. Present grouped by status (confirmed/corrected/expanded). This mode does NOT write files. For persistence: "Run `/vbw:vibe --discuss {N}` to capture as CONTEXT.md." Run `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/suggest-next.sh vibe`.
 
 ### Mode: UAT Remediation
 
 **Guard:** Initialized, target phase has `*-UAT.md` with `status: issues_found`.
 
-**Chain state tracking:** This mode uses ``!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/uat-remediation-state.sh` to persist the current stage of the remediation chain on disk. This ensures correct resumption after compaction or session restart — the chain does NOT rely on prompt memory alone.
+**Chain state tracking:** This mode uses `/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh` to persist the current stage of the remediation chain on disk. This ensures correct resumption after compaction or session restart — the chain does NOT rely on prompt memory alone.
 
 **Steps:**
 1. Resolve target phase from pre-computed state (`next_phase`, `next_phase_slug`) when `next_phase_state=needs_uat_remediation`. Set `PHASE_DIR` to the resolved phase directory path.
@@ -253,11 +253,11 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 3. Treat the UAT issues as source-of-truth scope. Do NOT ask the user to restate issues already recorded in UAT.
 4. **Read or initialize remediation stage:**
    ```bash
-   STAGE=$(bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/uat-remediation-state.sh get "$PHASE_DIR")
+   STAGE=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh get "$PHASE_DIR")
    ```
    - If `STAGE=none`: initialize based on severity:
      ```bash
-     STAGE=$(bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/uat-remediation-state.sh init "$PHASE_DIR" "major")
+     STAGE=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh init "$PHASE_DIR" "major")
      # or "minor" when uat_issues_major_or_higher=false
      ```
    - If `STAGE=done`: UAT remediation already completed for this phase. Display "Remediation already completed. Run `/vbw:verify --resume` to re-test." STOP.
@@ -265,16 +265,16 @@ If `planning_dir_exists=false`: display "Run /vbw:init first to set up your proj
 5. **Execute the current stage** based on `STAGE`:
    - `plan`: Execute **Plan mode steps 1-11 above** for the same phase. The UAT report serves as the scoping document — no separate discussion is needed (CONTEXT.md is already pre-seeded with UAT data by `init`). **Scout context (CRITICAL):** When Plan mode step 3 spawns Scout, include the pre-computed UAT issue lines (`ID|SEVERITY|DESCRIPTION` from step 2) in Scout's task prompt so Scout knows what codebase areas to investigate for each issue. Without this, Scout searches blind. After planning completes, advance:
      ```bash
-     bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/uat-remediation-state.sh advance "$PHASE_DIR"
+     bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh advance "$PHASE_DIR"
      ```
      Then continue to the next stage (`execute`), respecting autonomy confirmation rules.
    - `execute`: Continue through normal Execute flow for that phase. After execution completes, advance:
      ```bash
-     bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/uat-remediation-state.sh advance "$PHASE_DIR"
+     bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh advance "$PHASE_DIR"
      ```
    - `fix` (minor-only path): Route to a quick-fix implementation path for the same phase using the extracted UAT issue list as task input (equivalent to `/vbw:fix`, but without requiring the user to invoke it manually). After changes, advance:
      ```bash
-     bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/uat-remediation-state.sh advance "$PHASE_DIR"
+     bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/uat-remediation-state.sh advance "$PHASE_DIR"
      ```
      Suggest `/vbw:verify --resume`.
 6. Present a remediation summary with: phase, issue count, severity mix, current stage, and chosen path (`plan -> execute` or quick-fix).
@@ -299,7 +299,7 @@ This mode handles the case where a milestone was archived before UAT issues were
    ```bash
    IFS='|' read -ra UAT_DIRS <<< "$milestone_uat_phase_dirs"
    for dir in "${UAT_DIRS[@]}"; do
-     bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/create-remediation-phase.sh .vbw-planning "$dir"
+     bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/create-remediation-phase.sh .vbw-planning "$dir"
    done
    ```
    The script also writes a `.remediated` marker in each source milestone phase dir to prevent re-triggering on future sessions. After creating all phases, write a ROADMAP.md and update STATE.md reflecting the remediation phases, then route to Plan mode for the first phase.
@@ -309,7 +309,7 @@ This mode handles the case where a milestone was archived before UAT issues were
    if [ -z "$TARGET_PHASE_DIRS" ] && [ "$milestone_uat_phase_dir" != "none" ]; then
      TARGET_PHASE_DIRS="$milestone_uat_phase_dir"
    fi
-   bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/mark-milestone-remediated.sh .vbw-planning "$TARGET_PHASE_DIRS"
+   bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/mark-milestone-remediated.sh .vbw-planning "$TARGET_PHASE_DIRS"
    ```
    Then continue to normal all_done/new-work routing.
 
@@ -326,20 +326,20 @@ This mode handles the case where a milestone was archived before UAT issues were
    - Check for `{phase-dir}/{phase}-RESEARCH.md`.
    - **If missing:** Spawn Scout agent to research the phase goal, requirements, and relevant codebase patterns. Scout returns structured findings with sections: `## Findings`, `## Relevant Patterns`, `## Risks`, `## Recommendations`. The **orchestrator** (not Scout) writes the returned findings to `{phase-dir}/{phase}-RESEARCH.md`. Scout has `disallowedTools: Write` (platform-enforced) and cannot write files. Resolve Scout model:
      ```bash
-     SCOUT_MODEL=$(bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/config/model-profiles.json)
-     SCOUT_MAX_TURNS=$(bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}")
+     SCOUT_MODEL=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/config/model-profiles.json)
+     SCOUT_MAX_TURNS=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "{effort}")
      ```
    Pass `model: "${SCOUT_MODEL}"` and `maxTurns: ${SCOUT_MAX_TURNS}` to the Task tool.
    - **If exists:** Include it in Lead's context for incremental refresh. Lead may update RESEARCH.md if new information emerges.
    - **On failure:** Log warning, continue planning without research. Do not block.
    - If effort=turbo: skip entirely.
-4. **Context compilation:** If `config_context_compiler=true`, run `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/compile-context.sh {phase} lead {phases_dir}`. Include `.context-lead.md` in Lead agent context if produced.
+4. **Context compilation:** If `config_context_compiler=true`, run `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/compile-context.sh {phase} lead {phases_dir}`. Include `.context-lead.md` in Lead agent context if produced.
 5. **Turbo shortcut:** If effort=turbo, skip Lead. Read phase reqs from ROADMAP.md, create single lightweight PLAN.md inline.
 6. **Other efforts:**
    - Resolve Lead model:
      ```bash
-     LEAD_MODEL=$(bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-model.sh lead .vbw-planning/config.json `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/config/model-profiles.json)
-       LEAD_MAX_TURNS=$(bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-max-turns.sh lead .vbw-planning/config.json "{effort}")
+     LEAD_MODEL=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-model.sh lead .vbw-planning/config.json /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/config/model-profiles.json)
+       LEAD_MAX_TURNS=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-max-turns.sh lead .vbw-planning/config.json "{effort}")
      if [ $? -ne 0 ]; then
        echo "$LEAD_MODEL" >&2
        exit 1
@@ -387,7 +387,7 @@ This mode handles the case where a milestone was archived before UAT issues were
    ```
 9. **Planning commit boundary (conditional):**
    ```bash
-  PG_SCRIPT="`!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/planning-git.sh"
+  PG_SCRIPT="/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/planning-git.sh"
    if [ -f "$PG_SCRIPT" ]; then
      bash "$PG_SCRIPT" commit-boundary "plan phase {N}" .vbw-planning/config.json
    else
@@ -400,7 +400,7 @@ This mode handles the case where a milestone was archived before UAT issues were
 
 ### Mode: Execute
 
-Read ``!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/references/execute-protocol.md` and follow its instructions.
+Read `/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/references/execute-protocol.md` and follow its instructions.
 
 This mode delegates entirely to the protocol file. Before reading:
 1. **Parse arguments:** Phase number (auto-detect if omitted), --effort, --skip-qa, --plan=NN.
@@ -410,8 +410,8 @@ This mode delegates entirely to the protocol file. Before reading:
    - All plans have SUMMARY.md: cautious/standard -> WARN + confirm; confident/pure-vibe -> warn + auto-continue.
    - **Milestone path guard:** If `{phases_dir}` contains `.vbw-planning/milestones/`, STOP "Cannot execute inside archived milestones." This prevents writing artifacts into shipped milestone directories.
 3. **Compile context:** If `config_context_compiler=true`, run:
-   - `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/compile-context.sh {phase} dev {phases_dir} {plan_path}`
-   - `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/compile-context.sh {phase} qa {phases_dir}`
+   - `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/compile-context.sh {phase} dev {phases_dir} {plan_path}`
+   - `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/compile-context.sh {phase} qa {phases_dir}`
    Include compiled context paths in Dev and QA task descriptions.
 
 Then Read the protocol file and execute Steps 2-5 as written.
@@ -423,7 +423,7 @@ No SUMMARY.md: STOP "Phase {N} has no completed plans. Run /vbw:vibe first."
 **Phase auto-detection:** First phase with `*-SUMMARY.md` but no canonical `*-UAT.md` (exclude `*-SOURCE-UAT.md` copies). All verified: STOP "All phases have UAT results. Specify: `/vbw:verify N`"
 
 **Steps:**
-1. Read ``!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/commands/verify.md` protocol.
+1. Read `/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/commands/verify.md` protocol.
 2. Execute the verify protocol for the target phase.
 3. Display results per verify.md output format.
 
@@ -438,8 +438,8 @@ Missing name: STOP "Usage: `/vbw:vibe --add <phase-name>`"
 3. Next number: highest in ROADMAP.md + 1, zero-padded.
 4. Create dir: `mkdir -p .vbw-planning/phases/{NN}-{slug}/`
 5. **Problem research (conditional):** If $ARGUMENTS contain a problem description (bug report, feature request, multi-sentence intent) rather than just a bare phase name:
-   - Resolve Scout model: `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-model.sh scout .vbw-planning/config.json `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/config/model-profiles.json`
-   - Resolve Scout max turns: `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "$(jq -r '.effort // "balanced"' .vbw-planning/config.json 2>/dev/null)"`
+   - Resolve Scout model: `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-model.sh scout .vbw-planning/config.json /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/config/model-profiles.json`
+   - Resolve Scout max turns: `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/resolve-agent-max-turns.sh scout .vbw-planning/config.json "$(jq -r '.effort // "balanced"' .vbw-planning/config.json 2>/dev/null)"`
    - Spawn Scout agent to research the problem in the codebase. Scout returns structured findings with sections: `## Findings`, `## Relevant Patterns`, `## Risks`, `## Recommendations`. Scout has `disallowedTools: Write` and cannot write files — the **orchestrator** writes the returned findings to `{phase-dir}/{NN}-RESEARCH.md`.
    - Use Scout findings to write an informed phase goal and success criteria in ROADMAP.md.
    - On failure: log warning, write phase goal from $ARGUMENTS alone. Do not block.
@@ -489,7 +489,7 @@ No work (no SUMMARY.md files): STOP "Nothing to ship."
 **Hard UAT gate (always, non-bypassable):**
 Before any audit/bypass handling, run:
 ```bash
-bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/archive-uat-guard.sh
+bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/archive-uat-guard.sh
 ```
 If exit code is 2: STOP. Unresolved UAT (active or milestone) blocks archive regardless of `--skip-audit` or `--force`.
 
@@ -507,14 +507,14 @@ FAIL -> STOP with remediation suggestions. WARN -> proceed with warnings.
 **Steps:**
 1. **Derive milestone slug (deterministic — do NOT invent a slug):**
    ```bash
-   MILESTONE_SLUG=$(bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/derive-milestone-slug.sh .vbw-planning)
+   MILESTONE_SLUG=$(bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/derive-milestone-slug.sh .vbw-planning)
    ```
    This reads ROADMAP.md phase names and outputs a numbered kebab-case slug (e.g., `01-setup-api-layer`). Override with `--tag` if provided. **Never use a hardcoded slug like "default" — always use the script output.**
 2. Parse args: --tag=vN.N.N (custom tag), --no-tag (skip), --force (skip non-UAT audit).
 3. Compute summary: from ROADMAP (phases), SUMMARY.md files (tasks/commits/deviations), REQUIREMENTS.md (satisfied count).
 4. **Rolling summary (conditional):** If `rolling_summary=true` in config:
    ```bash
-   bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/compile-rolling-summary.sh \
+   bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/compile-rolling-summary.sh \
      .vbw-planning/phases .vbw-planning/ROLLING-CONTEXT.md 2>/dev/null || true
    ```
    Compiles final rolling context before artifacts move to milestones/. Fail-open.
@@ -522,13 +522,13 @@ FAIL -> STOP with remediation suggestions. WARN -> proceed with warnings.
 5. Archive: `mkdir -p .vbw-planning/milestones/`. Move roadmap, state, phases to milestones/{SLUG}/. Write SHIPPED.md. Delete stale RESUME.md.
 5b. **Persist project-level state:** After archiving, run:
    ```bash
-   bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/persist-state-after-ship.sh \
+   bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/persist-state-after-ship.sh \
      .vbw-planning/milestones/{SLUG}/STATE.md .vbw-planning/STATE.md "{PROJECT_NAME}"
    ```
    This extracts project-level sections (Todos, Decisions, Skills, Blockers, Codebase Profile) from the archived STATE.md and writes a fresh root STATE.md. Milestone-specific sections (Current Phase, Activity Log, Phase Status) stay in the archive only. Fail-open: if the script fails, warn but continue.
 6. Planning commit boundary (conditional):
    ```bash
-  PG_SCRIPT="`!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/planning-git.sh"
+  PG_SCRIPT="/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/planning-git.sh"
    if [ -f "$PG_SCRIPT" ]; then
      bash "$PG_SCRIPT" commit-boundary "archive milestone {SLUG}" .vbw-planning/config.json
    else
@@ -539,7 +539,7 @@ FAIL -> STOP with remediation suggestions. WARN -> proceed with warnings.
 7. Git branch merge: if `milestone/{SLUG}` branch exists, merge --no-ff. Conflict -> abort, warn. No branch -> skip.
 8. Git tag: unless --no-tag, `git tag -a {tag} -m "Shipped milestone: {name}"`. Default: `milestone/{SLUG}`.
 9. Regenerate CLAUDE.md: update Active Context, remove shipped refs. Preserve non-VBW content — only replace VBW-managed sections, keep user's own sections intact.
-10. Present: Phase Banner with metrics (phases, tasks, commits, requirements, deviations), archive path, tag, branch status, memory status. Run `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/suggest-next.sh vibe`.
+10. Present: Phase Banner with metrics (phases, tasks, commits, requirements, deviations), archive path, tag, branch status, memory status. Run `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/suggest-next.sh vibe`.
 
 ### Pure-Vibe Phase Loop
 
@@ -563,4 +563,4 @@ Per-mode output:
 
 Rules: Phase Banner (double-line box), ◆ running, ✓ complete, ✗ failed, ○ skipped, Metrics Block, Next Up Block, no ANSI color codes.
 
-Run `bash `!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/suggest-next.sh vibe {result}` for Next Up suggestions.
+Run `bash /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/suggest-next.sh vibe {result}` for Next Up suggestions.

@@ -254,7 +254,7 @@ These are already recorded in the UAT.md and will flow into remediation alongsid
 
 **Planning artifact boundary commit (conditional):**
 ```bash
-PG_SCRIPT="`!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/planning-git.sh"
+PG_SCRIPT="/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/planning-git.sh"
 if [ -f "$PG_SCRIPT" ]; then
   bash "$PG_SCRIPT" commit-boundary "verify phase {N}" .vbw-planning/config.json
 else
