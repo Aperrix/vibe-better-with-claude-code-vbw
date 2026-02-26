@@ -133,7 +133,7 @@ Check tables use **5-column** or **6-column** format depending on category-speci
 - Convention: `# | ID | Convention | File | Status | Detail`
 
 ```markdown
-# Verification: Phase {N}
+# Verification: Phase {NN}
 ## Must-Have Checks
 | # | ID | Truth/Condition | Status | Evidence |
 ## Artifact Checks

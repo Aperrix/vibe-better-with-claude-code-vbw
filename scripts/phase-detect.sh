@@ -410,6 +410,21 @@ echo "uat_issues_major_or_higher=$UAT_ISSUES_MAJOR_OR_HIGHER"
 echo "uat_issues_phases=$UAT_ISSUES_PHASES"
 echo "uat_issues_count=$UAT_ISSUES_COUNT"
 
+# --- Misnamed plan file diagnostic ---
+# Detect type-first naming (PLAN-01.md instead of 01-PLAN.md) for actionable warnings.
+MISNAMED_PLANS=false
+if [ ${#PHASE_DIRS[@]} -gt 0 ]; then
+  for _mn_dir in ${PHASE_DIRS[@]+"${PHASE_DIRS[@]}"}; do
+    [ -d "$_mn_dir" ] || continue
+    # Use -iregex for proper multi-digit matching without false positives on compounds like PLAN-01-RESEARCH.md
+    if find "$_mn_dir" -maxdepth 1 \( -iname 'PLAN-[0-9].md' -o -iname 'PLAN-[0-9][0-9].md' -o -iname 'PLAN-[0-9]-SUMMARY.md' -o -iname 'PLAN-[0-9][0-9]-SUMMARY.md' -o -iname 'PLAN-[0-9]-CONTEXT.md' -o -iname 'PLAN-[0-9][0-9]-CONTEXT.md' -o -iname 'SUMMARY-[0-9].md' -o -iname 'SUMMARY-[0-9][0-9].md' -o -iname 'CONTEXT-[0-9].md' -o -iname 'CONTEXT-[0-9][0-9].md' -o -iregex '.*/plan-[0-9][0-9][0-9][0-9]*\.md' -o -iregex '.*/plan-[0-9][0-9][0-9][0-9]*-summary\.md' -o -iregex '.*/plan-[0-9][0-9][0-9][0-9]*-context\.md' -o -iregex '.*/summary-[0-9][0-9][0-9][0-9]*\.md' -o -iregex '.*/context-[0-9][0-9][0-9][0-9]*\.md' \) 2>/dev/null | grep -q .; then
+      MISNAMED_PLANS=true
+      break
+    fi
+  done
+fi
+echo "misnamed_plans=$MISNAMED_PLANS"
+
 # --- Brownfield cross-reference: active remediation → milestone phases ---
 # Build a set of milestone phase paths already covered by active remediation
 # phases. This handles the case where create-remediation-phase.sh wasn't used

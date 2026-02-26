@@ -83,7 +83,7 @@ When `require_phase_discussion=true` in config, the lifecycle command (`/vbw:vib
 Always announce the auto-detected phase before proceeding. Format:
 
 ```
-Auto-detected Phase {N} ({slug}) -- {reason}
+Auto-detected Phase {NN} ({slug}) -- {reason}
 ```
 
 Reasons by command type:
@@ -93,3 +93,9 @@ Reasons by command type:
 - QA: "built, not yet verified"
 
 Then continue with the rest of the command as if the user had typed that phase number.
+
+## Diagnostic Variables
+
+`phase-detect.sh` also emits diagnostic variables alongside phase state:
+
+- `misnamed_plans=true|false` — Set to `true` when any phase directory contains type-first filenames (e.g., `PLAN-01.md` instead of `01-PLAN.md`). Commands should run `normalize-plan-filenames.sh` on all phase directories before proceeding when this is `true`.

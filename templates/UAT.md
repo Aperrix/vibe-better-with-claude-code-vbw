@@ -14,7 +14,7 @@ issues: {N}
 
 ## Tests
 
-### P{plan}-T{N}: {test-title}
+### P{plan}-T{NN}: {test-title}
 
 - **Plan:** {plan-id} -- {plan-title}
 - **Scenario:** {what to do}
@@ -24,7 +24,7 @@ issues: {N}
   - Description: {issue-description}
   - Severity: {critical|major|minor}
 
-### D{N}: {discovered-issue-title}
+### D{NN}: {discovered-issue-title}
 
 - **Plan:** (discovered during {test-id})
 - **Scenario:** User observation during UAT

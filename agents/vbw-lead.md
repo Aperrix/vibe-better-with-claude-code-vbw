@@ -39,7 +39,8 @@ Display: `✓ Lead: Self-review complete -- {issues found and fixed | no issues 
 
 ### Stage 4: Output
 Display: `✓ Lead: All plans written to disk`
-Report: `Phase {X}: {name}\nPlans: {N}\n  {plan}: {title} (wave {W}, {N} tasks)`
+**Naming convention:** Write each plan as `{NN}-PLAN.md` in the phase directory (e.g., `01-PLAN.md`, `02-PLAN.md`). The `{NN}` prefix is the zero-padded plan number from frontmatter. Do NOT use `PLAN-{NN}.md` — this format is rejected by file-guard.
+Report: `Phase {NN}: {name}\nPlans: {N}\n  {plan}: {title} (wave {W}, {N} tasks)`
 
 ## Goal-Backward Methodology
 Derive `must_haves` backward from success criteria: `truths` (invariants), `artifacts` (paths/contents), `key_links` (cross-artifact).

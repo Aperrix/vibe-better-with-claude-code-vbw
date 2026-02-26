@@ -449,8 +449,8 @@ load test_helper
   grep -qi 'recorded in the UAT.md' "$PROJECT_ROOT/commands/verify.md"
 }
 
-@test "verify command discovered issues uses D{N} IDs" {
-  grep -q 'D{N}' "$PROJECT_ROOT/commands/verify.md"
+@test "verify command discovered issues uses D{NN} IDs" {
+  grep -q 'D{NN}' "$PROJECT_ROOT/commands/verify.md"
 }
 
 # =============================================================================
@@ -501,7 +501,7 @@ load test_helper
 
 @test "all discovered issues sections specify testName format" {
   local failed=""
-  # verify.md is excluded — uses D{N} format for UAT remediation, not testName format
+  # verify.md is excluded — uses D{NN} format for UAT remediation, not testName format
   for file in commands/fix.md commands/debug.md commands/qa.md references/execute-protocol.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -q 'testName.*path/to/file.*error' "$PROJECT_ROOT/$file"; then
@@ -547,7 +547,7 @@ load test_helper
 
 @test "all discovered issues sections have de-duplication instruction" {
   local failed=""
-  # verify.md is excluded — uses D{N} sequential IDs, dedup not applicable
+  # verify.md is excluded — uses D{NN} sequential IDs, dedup not applicable
   for file in commands/fix.md commands/debug.md commands/qa.md references/execute-protocol.md; do
     if grep -q 'Discovered Issues' "$PROJECT_ROOT/$file"; then
       if ! grep -qi 'de-duplicate\|De-duplicate' "$PROJECT_ROOT/$file"; then
@@ -595,8 +595,8 @@ load test_helper
   sed -n '/\*\*"Skip" selected:\*\*/,/\*\*Freeform/p' "$PROJECT_ROOT/commands/verify.md" | grep -qi 'discovered issue\|Step 6a\|observation'
 }
 
-@test "verify command D{N} resume scans existing entries" {
-  grep -qi 'scan existing.*D{N}\|highest existing number\|max+1' "$PROJECT_ROOT/commands/verify.md"
+@test "verify command D{NN} resume scans existing entries" {
+  grep -qi 'scan existing.*D{NN}\|highest existing number\|max+1' "$PROJECT_ROOT/commands/verify.md"
 }
 
 @test "dev agent DEVN-05 has priority rule for overlapping uncertainty" {

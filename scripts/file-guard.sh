@@ -17,6 +17,33 @@ INPUT=$(cat 2>/dev/null) || exit 0
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""' 2>/dev/null) || exit 0
 [ -z "$FILE_PATH" ] && exit 0
 
+# Block misnamed plan/summary/context files in phase dirs (type-first format)
+# Must precede the .vbw-planning/* exemption which exits 0 for all planning artifacts.
+# Case-insensitive on extension (.md/.MD/.Md) to prevent bypass.
+# Normalize path: resolve .. components so traversal paths are matched intentionally,
+# not via accidental * matching across / separators.
+_FG_NORMALIZED=$(echo "$FILE_PATH" | sed 's#/[^/]*/\.\./#/#g')
+FILE_PATH_LC=$(echo "$_FG_NORMALIZED" | tr '[:upper:]' '[:lower:]')
+case "$FILE_PATH_LC" in
+  *.vbw-planning/phases/*/plan-[0-9]*.md|*.vbw-planning/phases/*/summary-[0-9]*.md|*.vbw-planning/phases/*/context-[0-9]*.md)
+    _BASENAME_CHECK=$(basename "$FILE_PATH" 2>/dev/null) || _BASENAME_CHECK="$FILE_PATH"
+    _BASENAME_LC=$(echo "$_BASENAME_CHECK" | tr '[:upper:]' '[:lower:]')
+    # Only block exact type-first patterns (type-NN.md) and known compounds (plan-NN-summary.md, plan-NN-context.md).
+    # Allow arbitrary filenames like plan-01-review.md through.
+    if echo "$_BASENAME_LC" | grep -qE '^(plan|summary|context)-[0-9]+\.md$' || \
+       echo "$_BASENAME_LC" | grep -qE '^plan-[0-9]+-(summary|context)\.md$'; then
+      # Detect the artifact type for a precise error message
+      _FG_TYPE="PLAN"
+      case "$_BASENAME_LC" in
+        summary-*|*-summary.*) _FG_TYPE="SUMMARY" ;;
+        context-*|*-context.*) _FG_TYPE="CONTEXT" ;;
+      esac
+      echo "Blocked: wrong naming convention for $_FG_TYPE artifact. Use {NN}-${_FG_TYPE}.md (e.g., 01-${_FG_TYPE}.md), not ${_FG_TYPE}-{NN}.md ($_BASENAME_CHECK)" >&2
+      exit 2
+    fi
+    ;;
+esac
+
 # Exempt planning artifacts — these are always allowed
 case "$FILE_PATH" in
   *.vbw-planning/milestones/*/phases/*)

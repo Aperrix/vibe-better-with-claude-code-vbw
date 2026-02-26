@@ -119,7 +119,7 @@ Decision tree:
 - `prefer_teams='auto'`: Same as when_parallel (use current behavior, smart routing can downgrade)
 
 When team should be created based on prefer_teams:
-- Create team via TeamCreate: `team_name="vbw-phase-{NN}"`, `description="Phase {N}: {phase-name}"`
+- Create team via TeamCreate: `team_name="vbw-phase-{NN}"`, `description="Phase {NN}: {phase-name}"`
 - All Dev and QA agents below MUST be spawned with `team_name: "vbw-phase-{NN}"` and `name: "dev-{MM}"` (from plan number) or `name: "qa"` parameters on the Task tool invocation.
 
 When team should NOT be created (1 plan with when_parallel/auto, or turbo, or smart-routed turbo):
@@ -219,7 +219,7 @@ description: |
   Model: ${DEV_MODEL}
   Phase context: {phase-dir}/.context-dev.md (if compiled)
   If `.vbw-planning/codebase/META.md` exists, read CONVENTIONS.md, PATTERNS.md, STRUCTURE.md, and DEPENDENCIES.md (whichever exist) from `.vbw-planning/codebase/` to bootstrap codebase understanding before executing.
-  {If resuming: "Resume from Task {N}. Tasks 1-{N-1} already committed."}
+  {If resuming: "Resume from Task {NN}. Tasks 1-{NN-1} already committed."}
   {If autonomous: false: "This plan has checkpoints -- pause for user input."}
 activeForm: "Executing {NN-MM}"
 ```
@@ -468,7 +468,7 @@ If `AUTO_UAT` is not `true` and autonomy is confident or pure-vibe: display "○
 2. Generate test scenarios from completed SUMMARY.md files:
    - Read each SUMMARY.md: extract what was built, files modified, must_haves
    - Generate 1-3 test scenarios per plan requiring HUMAN verification
-   - Minimum 1 test per plan. Test IDs: `P{plan}-T{N}`
+   - Minimum 1 test per plan. Test IDs: `P{plan}-T{NN}`
    - Write initial `{phase}-UAT.md` in phase dir with all tests (Result fields empty)
 3. **CHECKPOINT loop — present ONE test at a time, wait for user response:**
 
@@ -478,7 +478,7 @@ If `AUTO_UAT` is not `true` and autonomy is confident or pure-vibe: display "○
 
    ```text
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   CHECKPOINT {N}/{total} — {plan-id}: {plan-title}
+   CHECKPOINT {NN}/{total} — {plan-id}: {plan-title}
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
    {scenario description}
@@ -580,7 +580,7 @@ When `worktree_isolation="off"`: skip this block silently.
 ```bash
 PG_SCRIPT="${VBW_PLUGIN_ROOT}/scripts/planning-git.sh"
 if [ -f "$PG_SCRIPT" ]; then
-  bash "$PG_SCRIPT" commit-boundary "complete phase {N}" .vbw-planning/config.json
+  bash "$PG_SCRIPT" commit-boundary "complete phase {NN}" .vbw-planning/config.json
 else
   echo "VBW: planning-git.sh unavailable; skipping planning git boundary commit" >&2
 fi
@@ -604,7 +604,7 @@ fi
 Display per @${CLAUDE_PLUGIN_ROOT}/references/vbw-brand-essentials.md:
 ```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Phase {N}: {name} -- Built
+Phase {NN}: {name} -- Built
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Plan Results:
