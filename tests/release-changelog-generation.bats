@@ -9,16 +9,26 @@ REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 RELEASE_CMD="$REPO_ROOT/internal/release.md"
 
 # Helper: extract guard section by number (anchored to guard number prefix)
+# Stops at the next guard number OR at a markdown ## heading (prevents
+# capturing finalize guards that share the same number).
 extract_guard() {
   local keyword="$1"
   local num
   num=$(echo "$keyword" | grep -oE '^[0-9]+')
   if [ -n "$num" ]; then
-    # Anchor to guard number prefix for precise extraction
-    awk -v n="$num" '$0 ~ "^"n"\\. \\*\\*"{found=1; print; next} found && /^[0-9]+\./{found=0} found{print}' "$RELEASE_CMD"
+    awk -v n="$num" '
+      $0 ~ "^"n"\\. \\*\\*" {found=1; print; next}
+      found && /^[0-9]+\./ {found=0}
+      found && /^## / {found=0}
+      found {print}
+    ' "$RELEASE_CMD"
   else
-    # Fallback to keyword match (used when keyword has no leading number)
-    awk -v kw="$keyword" 'index($0, kw){found=1; print; next} found && /^[0-9]+\./{found=0} found{print}' "$RELEASE_CMD"
+    awk -v kw="$keyword" '
+      index($0, kw) {found=1; print; next}
+      found && /^[0-9]+\./ {found=0}
+      found && /^## / {found=0}
+      found {print}
+    ' "$RELEASE_CMD"
   fi
 }
 
@@ -65,6 +75,13 @@ extract_audit1() {
   guard5=$(extract_guard "5. No CHANGELOG.md")
   # Non-dry-run path also skips to Guard 7 (Guard 6 is satisfied)
   echo "$guard5" | grep -qi 'Skip to Guard 7'
+}
+
+@test "guard 5 warns about empty section when --skip-audit" {
+  local guard5
+  guard5=$(extract_guard "5. No CHANGELOG.md")
+  echo "$guard5" | grep -qi 'skip-audit'
+  echo "$guard5" | grep -qi 'empty\|re-running without'
 }
 
 # --- Guard 6: Missing [Unreleased] ---
