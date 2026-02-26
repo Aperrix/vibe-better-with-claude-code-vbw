@@ -30,20 +30,20 @@ RELEASE_CMD="$REPO_ROOT/internal/release.md"
 }
 
 @test "release command opens a draft PR" {
-  # Step 8 must contain gh pr create --draft
-  local step8
-  step8=$(awk '/^### Step 8: Open draft PR/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
-  [ -n "$step8" ]
-  echo "$step8" | grep -qi 'draft'
-  echo "$step8" | grep -qi 'pr.*create\|gh.*pr'
+  # Step 7 must contain gh pr create --draft
+  local step7
+  step7=$(awk '/^### Step 7: Open draft PR/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
+  [ -n "$step7" ]
+  echo "$step7" | grep -qi 'draft'
+  echo "$step7" | grep -qi 'pr.*create\|gh.*pr'
 }
 
 @test "release command does NOT push directly to current branch in prepare mode" {
-  # Step 7 should NOT contain a bare 'git push' that pushes to the current branch.
+  # Step 6 should NOT contain a bare 'git push' that pushes to the current branch.
   # It should push the release branch, not main.
   # Extract the push step content (between "Push release branch" and next heading)
   local push_section
-  push_section=$(awk '/^### Step 7: Push release branch/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
+  push_section=$(awk '/^### Step 6: Push release branch/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
   # The prepare-mode push must reference the release branch and explicit origin target
   echo "$push_section" | grep -q 'git push -u origin release/v{new-version}'
   echo "$push_section" | grep -qi 'release/'
@@ -124,15 +124,17 @@ RELEASE_CMD="$REPO_ROOT/internal/release.md"
   echo "$guard_section" | grep -qi 'reject'
 }
 
-@test "guard checks remote branches for existing release branch" {
-  # Guard #7 must distinguish branch-exists vs remote lookup failure
+@test "guard auto-cleans existing release branches instead of stopping" {
+  # Guard #7 must auto-cleanup, not hard STOP
   local guard_section
   guard_section=$(awk '/^## Guard/{found=1; next} /^## [^G]/{found=0} found{print}' "$RELEASE_CMD")
   echo "$guard_section" | grep -qi 'git branch --list'
   echo "$guard_section" | grep -qi 'git ls-remote --heads origin'
   echo "$guard_section" | grep -qi 'Could not verify remote release branches'
   echo "$guard_section" | grep -qi 'origin.*unreachable\|unauthorized'
-  echo "$guard_section" | grep -qi 'Release branch already exists'
+  # Should describe cleanup, not "already exists" STOP
+  echo "$guard_section" | grep -qi 'cleanup\|clean up\|delet'
+  ! echo "$guard_section" | grep -qi 'STOP.*Release branch already exists'
 }
 
 @test "finalize commit search does not use --all-match" {
@@ -161,4 +163,28 @@ RELEASE_CMD="$REPO_ROOT/internal/release.md"
   local count
   count=$(grep -c '^## Output Format$' "$RELEASE_CMD")
   [ "$count" -eq 1 ]
+}
+
+# --- Finalize Step 4: cleanup visibility (Finding 5) ---
+
+@test "finalize step 4 does not suppress remote deletion errors silently" {
+  local step4
+  step4=$(awk '/^### Finalize Step 4/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
+  [ -n "$step4" ]
+  # Remote deletion must not use blanket || true suppression
+  ! echo "$step4" | grep -q 'push origin --delete.*|| true'
+  # Must warn on failure instead
+  echo "$step4" | grep -qi 'warn\|Could not delete\|delete manually'
+}
+
+@test "finalize step 4 classifies remote not-found as success" {
+  local step4
+  step4=$(awk '/^### Finalize Step 4/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
+  echo "$step4" | grep -qi 'not-found\|not found\|does not exist\|already gone'
+}
+
+@test "finalize step 4 continues on cleanup failure (non-fatal)" {
+  local step4
+  step4=$(awk '/^### Finalize Step 4/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
+  echo "$step4" | grep -qi 'non-fatal\|continue.*Step 5\|continue.*regardless'
 }

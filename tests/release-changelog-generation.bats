@@ -1,9 +1,10 @@
 #!/usr/bin/env bats
 
-# Tests that internal/release.md auto-creates [Unreleased] section and populates
-# it from merged PRs (primary) and commits (fallback) when missing.
+# Tests that internal/release.md generates changelog entries directly under a
+# versioned section header (no [Unreleased] indirection) and uses a robust grep
+# pattern to find the last release commit.
 #
-# Fixes #169
+# Fixes #169, #172
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 RELEASE_CMD="$REPO_ROOT/internal/release.md"
@@ -42,6 +43,11 @@ extract_audit1() {
   awk '/\*\*Audit 1/{found=1; print; next} found && /^\*\*Audit [2-9]/{found=0} found{print}' "$RELEASE_CMD"
 }
 
+# Helper: extract version pre-computation section
+extract_version_precompute() {
+  awk '/^### Version Pre-computation/{found=1; print; next} found && /^(### |## )/{found=0} found{print}' "$RELEASE_CMD"
+}
+
 @test "release command file exists" {
   [ -f "$RELEASE_CMD" ]
 }
@@ -65,7 +71,13 @@ extract_audit1() {
   guard5=$(extract_guard "5. No CHANGELOG.md")
   [ -n "$guard5" ]
   echo "$guard5" | grep -qi 'create.*CHANGELOG\|CHANGELOG.*create'
-  echo "$guard5" | grep -qi '\[Unreleased\]'
+}
+
+@test "guard 5 does NOT create [Unreleased] section" {
+  local guard5
+  guard5=$(extract_guard "5. No CHANGELOG.md")
+  # [Unreleased] indirection was removed — entries go directly under versioned header
+  ! echo "$guard5" | grep -qi '\[Unreleased\]'
 }
 
 @test "guard 5 respects --dry-run by not writing" {
@@ -74,86 +86,101 @@ extract_audit1() {
   echo "$guard5" | grep -qi 'dry-run.*NOT write\|dry-run.*do NOT'
 }
 
-@test "guard 5 dry-run skips to Guard 7 (not Guard 6)" {
+@test "guard 5 skips to Guard 6 (version sync)" {
   local guard5
   guard5=$(extract_guard "5. No CHANGELOG.md")
-  # Dry-run path should skip to Guard 7, not chain to Guard 6
-  echo "$guard5" | grep -qi 'Skip to Guard 7\|Guard 7'
-  ! echo "$guard5" | grep -qi 'Continue to Guard 6'
+  echo "$guard5" | grep -qi 'Guard 6'
 }
 
-@test "guard 5 non-dry-run skips to Guard 7" {
-  local guard5
-  guard5=$(extract_guard "5. No CHANGELOG.md")
-  # Non-dry-run path also skips to Guard 7 (Guard 6 is satisfied)
-  echo "$guard5" | grep -qi 'Skip to Guard 7'
+# --- Guard 6 (was [Unreleased]) removed ---
+
+@test "no guard for [Unreleased] section exists" {
+  # Guard 6 was the old [Unreleased] guard — it should not exist in the file
+  ! grep -q 'No \[Unreleased\]' "$RELEASE_CMD"
 }
 
-@test "guard 5 warns about empty section when --skip-audit" {
-  local guard5
-  guard5=$(extract_guard "5. No CHANGELOG.md")
-  echo "$guard5" | grep -qi 'skip-audit'
-  echo "$guard5" | grep -qi 'empty\|re-running without'
-}
-
-# --- Guard 6: Missing [Unreleased] ---
-
-@test "guard 6 auto-creates [Unreleased] section when missing" {
+@test "guard 6 is now version sync" {
   local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
+  guard6=$(extract_guard "6. Version sync")
   [ -n "$guard6" ]
-  echo "$guard6" | grep -qi 'insert\|create'
-  ! echo "$guard6" | grep -qi 'WARN.*confirm'
-  ! echo "$guard6" | grep -qi 'only bump versions'
+  echo "$guard6" | grep -qi 'bump-version\|sync'
 }
 
-@test "guard 6 inserts [Unreleased] above first version entry" {
-  local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
-  echo "$guard6" | grep -qi 'above.*first.*\[x\.y\.z\]\|above.*latest\|above.*version'
+@test "guard 7 auto-cleans existing release branches" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  [ -n "$guard7" ]
+  # Should describe auto-cleanup, not hard STOP
+  echo "$guard7" | grep -qi 'cleanup\|clean up\|delet'
+  ! echo "$guard7" | grep -qi 'STOP.*already exists'
 }
 
-@test "guard 6 signals that audit will populate the section" {
-  local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
-  echo "$guard6" | grep -qi 'audit.*populate\|audit.*generate\|audit.*insert'
+@test "guard 7 deletes local and remote branches" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'git branch -D\|git branch.*delete'
+  echo "$guard7" | grep -qi 'git push origin --delete'
 }
 
-@test "guard 6 respects --dry-run by not writing" {
-  local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
-  echo "$guard6" | grep -qi 'dry-run.*NOT write\|dry-run.*do NOT'
+@test "guard 7 finds associated PRs via gh" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'gh pr list'
 }
 
-@test "guard 6 skips creation when --skip-audit" {
-  local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
-  echo "$guard6" | grep -qi 'skip-audit.*NOT create\|skip-audit.*do NOT'
+@test "guard 7 handles gh CLI unavailability or failure" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'gh.*unavailable\|gh.*not available\|orphan'
+  # Must also handle gh returning non-zero (auth/network/API failure)
+  echo "$guard7" | grep -qi 'non-zero\|exit.*fail\|command.*fail\|exits non-zero'
 }
 
-@test "guard 6 --skip-audit takes precedence over --dry-run" {
-  local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
-  # skip-audit branch must appear before dry-run-only branch
-  local skip_line dry_line
-  skip_line=$(echo "$guard6" | grep -n -i '^\s*- If.*--skip-audit' | head -1 | cut -d: -f1)
-  dry_line=$(echo "$guard6" | grep -n -i '^\s*- If.*--dry-run.*without' | head -1 | cut -d: -f1)
-  [ -n "$skip_line" ]
-  [ -n "$dry_line" ]
-  [ "$skip_line" -lt "$dry_line" ]
+@test "guard 7 reports deletion failures instead of suppressing" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  # Must track and report deletion failures, not suppress with || true
+  echo "$guard7" | grep -qi 'fail.*delet\|delet.*fail\|Failed to delete'
+  ! echo "$guard7" | grep -q '|| true'
+  # Must have failure counters or tracking
+  echo "$guard7" | grep -qi 'failed.*>.*0\|{failed}'
 }
 
-@test "guard 6 preserves content between header and first version" {
-  local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
-  echo "$guard6" | grep -qi 'preserv'
+@test "guard 7 distinguishes remote not-found from network error" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  # Must parse stderr to distinguish 'remote ref does not exist' (success)
+  # from network/permission errors (failure)
+  echo "$guard7" | grep -qi 'remote ref does not exist\|not-found\|stderr'
+  # Must list multiple known not-found message patterns for cross-version robustness
+  echo "$guard7" | grep -qi 'does not exist'
+  echo "$guard7" | grep -qi 'not found'
 }
 
-@test "guard 6 branches continue to Guard 7" {
-  local guard6
-  guard6=$(extract_guard "6. No [Unreleased]")
-  # All branches should reference Guard 7 (not jump directly to audit)
-  echo "$guard6" | grep -qi 'Guard 7'
+@test "guard 7 stops when all deletions fail" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'STOP.*All branch deletions failed\|All.*deletions failed.*STOP'
+}
+
+@test "guard 7 summary reports remaining uncleanable branches" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  # When partial failures occur, summary must indicate which branches remain
+  echo "$guard7" | grep -qi 'could not be fully cleaned\|failed_branches\|remaining'
+}
+
+@test "guard 7 handles multiple release branches" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  # Must mention handling all/each release branch, not just one
+  echo "$guard7" | grep -qi 'each\|all\|every'
+}
+
+@test "guard 7 still stops on remote unreachable" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'STOP.*unreachable\|STOP.*unauthorized\|Could not verify'
 }
 
 # --- Audit 1: Change collection ---
@@ -164,6 +191,40 @@ extract_audit1() {
   [ -n "$audit1" ]
   echo "$audit1" | grep -q 'gh pr list.*merged'
   echo "$audit1" | grep -q 'git log'
+}
+
+@test "audit 1 grep pattern matches all release commit formats" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Must use extended-regexp with scope restricted to (release) or no scope
+  echo "$audit1" | grep -q 'extended-regexp\|extended.regexp'
+  # Must restrict scope via (\\(release\\))? or equivalent
+  echo "$audit1" | grep -qE '\(release\)\)|\(\\\(release\\\)\)'
+  # Must support breaking-change marker via !?
+  echo "$audit1" | grep -q '!?'
+}
+
+@test "audit 1 grep pattern excludes version bump commits" {
+  local audit1
+  audit1=$(extract_audit1)
+  echo "$audit1" | grep -qi 'bump.*exclud\|exclud.*bump'
+}
+
+@test "audit 1 verifies subject line to avoid body-line false positives" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Must document the body-line matching limitation and describe subject verification
+  echo "$audit1" | grep -qi 'subject.*verif\|verif.*subject\|subject-verif'
+  echo "$audit1" | grep -qi 'body'
+  # Must specify the split-on-first-space parsing procedure
+  echo "$audit1" | grep -qi 'split.*first space\|separate.*hash.*subject'
+}
+
+@test "audit 1 grep pattern excludes fix(release) commits" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Pattern must be anchored to ^chore to exclude fix(release): commits
+  echo "$audit1" | grep -q '\^chore'
 }
 
 @test "audit 1 uses --first-parent to exclude branch commits" {
@@ -222,6 +283,30 @@ extract_audit1() {
   echo "$audit2" | grep -qi 'does not exist\|undocumented\|skip extraction'
 }
 
+@test "audit 2 checks versioned section instead of [Unreleased]" {
+  local audit2
+  audit2=$(awk '/\*\*Audit 2/{found=1; print; next} found && /^\*\*Audit [3-9]/{found=0} found{print}' "$RELEASE_CMD")
+  # Should reference the versioned section header, not [Unreleased]
+  echo "$audit2" | grep -qi '{new-version}'
+  ! echo "$audit2" | grep -q '\[Unreleased\]'
+}
+
+# --- Version pre-computation ---
+
+@test "version pre-computation happens before audit" {
+  local precompute
+  precompute=$(extract_version_precompute)
+  [ -n "$precompute" ]
+  echo "$precompute" | grep -qi 'VERSION\|bump'
+  # Must appear before Audit 1 in the file
+  local precompute_line audit1_line
+  precompute_line=$(grep -n 'Version Pre-computation' "$RELEASE_CMD" | head -1 | cut -d: -f1)
+  audit1_line=$(grep -n '\*\*Audit 1' "$RELEASE_CMD" | head -1 | cut -d: -f1)
+  [ -n "$precompute_line" ]
+  [ -n "$audit1_line" ]
+  [ "$precompute_line" -lt "$audit1_line" ]
+}
+
 # --- Audit 5: Remediation ---
 
 @test "audit 5 has dry-run gate before any writes" {
@@ -263,12 +348,12 @@ extract_audit1() {
   echo "$audit5" | grep -qi 'default.*Changed\|no.*prefix.*Changed\|no recognized.*Changed'
 }
 
-@test "audit 5 auto-inserts when [Unreleased] was auto-created" {
+@test "audit 5 inserts under versioned header directly" {
   local audit5
   audit5=$(extract_audit5)
-  # Must reference both Guard 5 and Guard 6 as auto-creation sources
-  echo "$audit5" | grep -qi 'Guard 5\|Guard 6'
-  echo "$audit5" | grep -qi 'auto-created.*insert\|auto-created.*automatic\|auto-created.*without.*confirmation'
+  # Entries go under ## [{new-version}] not [Unreleased]
+  echo "$audit5" | grep -qi '{new-version}'
+  ! echo "$audit5" | grep -q '\[Unreleased\]'
 }
 
 @test "audit 5 groups entries under conventional sub-headers" {
@@ -279,12 +364,130 @@ extract_audit1() {
   echo "$audit5" | grep -q 'Fixed'
 }
 
-# --- Step 4: Header rename ---
+@test "audit 5 removes stale untagged version sections from CHANGELOG" {
+  local audit5
+  audit5=$(extract_audit5)
+  # Audit 5 must scan for and remove stale version sections with no git tag
+  echo "$audit5" | grep -qi 'stale\|untagged\|no.*tag'
+  echo "$audit5" | grep -qi 'remov'
+}
 
-@test "step 4 still renames [Unreleased] to version header" {
+@test "audit 5 fetches tags before stale section check" {
+  local audit5
+  audit5=$(extract_audit5)
+  echo "$audit5" | grep -qi 'git fetch --tags\|fetch.*tags'
+}
+
+@test "audit 5 handles tag fetch failure gracefully" {
+  local audit5
+  audit5=$(extract_audit5)
+  # If git fetch --tags fails, must skip stale cleanup to avoid deleting valid sections
+  echo "$audit5" | grep -qi 'fetch.*fail\|non-zero\|exits non-zero'
+  echo "$audit5" | grep -qi 'skip.*stale\|skip.*cleanup'
+}
+
+@test "audit 5 stale section cleanup uses semver pattern matching" {
+  local audit5
+  audit5=$(extract_audit5)
+  # Must validate version headers match semver pattern to avoid false positives
+  echo "$audit5" | grep -qi 'semver\|\[0-9\].*\..*\[0-9\]'
+}
+
+# --- Step 4: Removed (was header rename) ---
+
+@test "no Step 4 header rename exists (eliminated with [Unreleased])" {
+  # Step 4 was "Update CHANGELOG header" which renamed [Unreleased] to version.
+  # Since [Unreleased] is eliminated, this step no longer exists.
+  ! grep -q 'Update CHANGELOG header' "$RELEASE_CMD"
+}
+
+@test "no [Unreleased] references remain in the release command" {
+  # The entire [Unreleased] indirection was removed
+  ! grep -q '\[Unreleased\]' "$RELEASE_CMD"
+}
+
+# --- Guard 5 + --skip-audit interaction ---
+
+@test "guard 5 creates CHANGELOG without audit entries when --skip-audit" {
+  local guard5
+  guard5=$(extract_guard "5. No CHANGELOG.md")
+  # Guard 5 must work with --skip-audit: create CHANGELOG.md and skip to Guard 6
+  # without requiring audit to populate entries
+  echo "$guard5" | grep -qi 'create.*CHANGELOG\|CHANGELOG.*create'
+  echo "$guard5" | grep -qi 'Guard 6\|Skip to Guard 6'
+  # The --skip-audit path is handled by the audit section, not Guard 5 itself.
+  # Guard 5's 'Otherwise' branch creates the file and skips to Guard 6.
+  # Verify Guard 5 does NOT condition creation on --skip-audit presence
+  # (it always creates if CHANGELOG is missing and not dry-run).
+  echo "$guard5" | grep -qi 'Otherwise.*create\|create CHANGELOG'
+}
+
+# --- Runtime behavior: candidate list not truncated (Finding 1) ---
+
+@test "audit 1 does not truncate candidate list with head" {
+  local audit1
+  audit1=$(extract_audit1)
+  # The git log command must NOT be piped through head
+  # (truncation could drop the true release commit behind body-line false positives)
+  ! echo "$audit1" | grep -q 'head -[0-9]'
+  # Must explicitly state no truncation
+  echo "$audit1" | grep -qi 'no truncation\|not truncated'
+}
+
+@test "audit 1 falls back to root commit when no subject matches" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Must specify root commit fallback via git rev-list --max-parents=0
+  echo "$audit1" | grep -qi 'root commit\|rev-list.*max-parents=0'
+}
+
+# --- Runtime behavior: subject parsing precision (Finding 2) ---
+
+@test "audit 1 specifies exact subject extraction from %H %s format" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Must specify split on first space to separate hash from subject
+  echo "$audit1" | grep -qi 'split.*first space\|separate.*hash.*subject'
+  # Must specify testing subject against the regex
+  echo "$audit1" | grep -qi 'test.*subject.*regex\|subject.*against.*regex\|subject matches'
+}
+
+# --- Runtime behavior: breaking-change marker (Finding 3) ---
+
+@test "audit 1 grep pattern supports breaking-change marker" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Pattern must include !? to handle chore(release)!: v1.33.0
+  echo "$audit1" | grep -q '!?'
+  # Must mention breaking-change in the explanation
+  echo "$audit1" | grep -qi 'breaking.change'
+}
+
+# --- Runtime behavior: remote deletion classification (Finding 4) ---
+
+@test "guard 7 lists multiple known not-found stderr patterns" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  # Must list multiple not-found patterns for cross-version/transport robustness
+  echo "$guard7" | grep -qi 'remote ref does not exist'
+  echo "$guard7" | grep -qi 'not found'
+  # Must describe conservative fallback for unknown messages
+  echo "$guard7" | grep -qi 'conservative\|false failure'
+}
+
+# --- Runtime behavior: finalize step 4 visibility (Finding 5) ---
+
+@test "finalize step 4 reports remote deletion failure instead of suppressing" {
   local step4
-  step4=$(awk '/^### Step 4: Update CHANGELOG header/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
+  step4=$(awk '/^### Finalize Step 4/{found=1; next} /^###/{found=0} found{print}' "$RELEASE_CMD")
   [ -n "$step4" ]
-  echo "$step4" | grep -q '\[Unreleased\]'
-  echo "$step4" | grep -q '\[{new-version}\]'
+  # Must NOT use || true for remote deletion (old behavior)
+  local remote_line
+  remote_line=$(echo "$step4" | grep -i 'push origin --delete')
+  [ -n "$remote_line" ]
+  ! echo "$remote_line" | grep -q '|| true'
+  # Must display a warning on failure
+  echo "$step4" | grep -qi 'Could not delete\|delete manually'
+  # Must be non-fatal (release is already tagged)
+  echo "$step4" | grep -qi 'non-fatal\|continue'
 }

@@ -29,24 +29,34 @@ Git status:
 3. **Not on main:** If current branch is not `main` → STOP: "Must be on main to prepare a release. Currently on `{branch}`."
 4. **Dirty tree:** If `git status --porcelain` shows uncommitted changes (excluding .claude/ and CLAUDE.md), WARN + confirm: "Uncommitted changes detected. They will NOT be in the release commit. Continue?"
 5. **No CHANGELOG.md:** If CHANGELOG.md does not exist:
-   - If `--dry-run` (with or without `--skip-audit`): display "ℹ Would create CHANGELOG.md with [Unreleased] section" but do NOT write. Skip to Guard 7 (Guard 6 is not triggered because its condition requires CHANGELOG.md to exist; audit is skipped if `--skip-audit`, otherwise runs as dry-run with no writes).
-   - If `--skip-audit` (without `--dry-run`): create CHANGELOG.md with `# Changelog\n\nAll notable changes to VBW will be documented in this file.\n\n## [Unreleased]\n`. Display: "ℹ Created CHANGELOG.md with [Unreleased] section. ⚠ Audit skipped — [Unreleased] section is empty. Consider re-running without --skip-audit to populate it." Skip to Guard 7.
-   - Otherwise: create it with `# Changelog\n\nAll notable changes to VBW will be documented in this file.\n\n## [Unreleased]\n`. Display: "ℹ Created CHANGELOG.md with [Unreleased] section." Skip to Guard 7 (Guard 6 is satisfied since [Unreleased] was just created).
-6. **No [Unreleased]:** If CHANGELOG.md exists but lacks `## [Unreleased]`:
-   - If `--skip-audit` (with or without `--dry-run`): do NOT create the section (nothing will populate it). Display: "○ Skipped [Unreleased] creation (audit skipped)." Skip to Guard 7. (`--skip-audit` takes precedence over `--dry-run` here because there is no audit to dry-run.)
-   - If `--dry-run` (without `--skip-audit`): display "ℹ Would create [Unreleased] section" but do NOT write. Continue to Guard 7.
-   - Otherwise: insert `## [Unreleased]` on a new blank line directly above the first `## [x.y.z]` entry (preserving any content between `# Changelog` and the first version entry). If no version entries exist, insert after the last non-empty line following the `# Changelog` header. Display: "ℹ Created [Unreleased] section — audit will populate it from commits." Continue to Guard 7.
-7. **Version sync:** `bash scripts/bump-version.sh --verify`. Out of sync → WARN but proceed (bump fixes it).
-8. **Existing release branch:** Check local first (`git branch --list 'release/v*'`) and remote second (`git ls-remote --heads origin 'refs/heads/release/v*'`).
+   - If `--dry-run` (with or without `--skip-audit`): display "ℹ Would create CHANGELOG.md" but do NOT write. Skip to Guard 6.
+   - Otherwise: create CHANGELOG.md with `# Changelog\n\nAll notable changes to VBW will be documented in this file.\n`. Display: "ℹ Created CHANGELOG.md." Skip to Guard 6.
+6. **Version sync:** `bash scripts/bump-version.sh --verify`. Out of sync → WARN but proceed (bump fixes it).
+7. **Existing release branch:** Check local first (`git branch --list 'release/v*'`) and remote second (`git ls-remote --heads origin 'refs/heads/release/v*'`).
    - If remote check exits non-zero (auth/network/repo failure) → STOP: "Could not verify remote release branches (`origin` unreachable or unauthorized). Fix remote access and retry."
-   - If local or remote checks return matches → STOP: "Release branch already exists (local or remote). Run `/vbw:release --finalize` after merging, or delete the stale branch."
+   - If local or remote checks return matches → **auto-cleanup** all stale release branches before proceeding. Collect all matching branch names (local + remote, deduplicated). Initialize counters: `{cleaned}=0`, `{failed}=0`. For each `release/v{version}` branch:
+     - Find associated open PR: `gh pr list --state open --head release/v{version} --json number,state --limit 1`. If `gh` is unavailable or the command exits non-zero (auth/network/API failure), skip PR lookup and display: "⚠ gh CLI unavailable or failed — deleting branch; check for orphaned PRs manually."
+     - Display: "⚠ Cleaning up stale release branch `release/v{version}` (PR #{N}, {state})" (or without PR info if `gh` unavailable/failed).
+     - Delete local branch: `git branch -D release/v{version}`. If the branch doesn't exist locally, skip silently. If deletion fails for another reason (non-zero exit), increment `{failed}` and display: "⚠ Failed to delete local branch `release/v{version}`."
+     - Delete remote branch: `git push origin --delete release/v{version} 2>&1`. If deletion succeeds, increment `{cleaned}`. If stderr contains `remote ref does not exist` (or similar not-found message), treat as success (already gone) and increment `{cleaned}`. If deletion fails for another reason (non-zero exit with different stderr, e.g., permissions or network error), increment `{failed}` and display: "⚠ Failed to delete remote branch `release/v{version}`." (Deleting the remote head branch auto-closes any associated PR on GitHub.)
+   - If `{failed} > 0` and `{cleaned} == 0` → STOP: "All branch deletions failed. Check permissions and retry."
+   - If `{failed} > 0` → display: "⚠ {failed} branch deletion(s) failed ({failed_branches} could not be fully cleaned) — check warnings above."
+   - Display cleanup summary: "ℹ Cleaned up {cleaned} stale release branch(es). Proceeding with fresh release."
+   - **Remote deletion error classification:** When `git push origin --delete` exits non-zero, classify the error by stderr content: (1) if stderr contains `remote ref does not exist`, `does not exist`, `not found`, or `unable to delete.*not found` → treat as success (branch already gone), increment `{cleaned}`; (2) for any other stderr content → treat as failure, increment `{failed}`. This list covers Git's known not-found messages across versions and transports (HTTPS, SSH). If a future Git version changes the message, the worst case is a false failure (conservative), not a false success.
 
 ## Pre-release Audit
 
 Skip if `--skip-audit`.
 
+### Version Pre-computation
+
+Compute `{new-version}` before the audit so changelog entries use the final version header directly:
+- Read `VERSION` to get the current version.
+- Apply the bump level: `--major` increments major and resets minor.patch to 0, `--minor` increments minor and resets patch to 0, default (no flag) increments patch.
+- Store `{new-version}` and `{release-date}` (today's date, `YYYY-MM-DD`) for use in audit remediation.
+
 **Audit 1: Collect changes since last release.**
-- Find last release commit: `git log --oneline --grep="chore: release" -1`, extract hash (fallback: root commit). Capture its date via `git log -1 --format=%Y-%m-%d {hash}` (fallback: empty string, which omits the `merged:>=` filter).
+- Find last release commit: `git log --extended-regexp --grep="^chore(\(release\))?!?: (release )?v[0-9]" --format="%H %s"`, then subject-verify each candidate to find the first true match (fallback: root commit). **Subject verification procedure:** For each candidate line, split on the first space to separate `{hash}` and `{subject}`. Test `{subject}` against the regex `^chore(\(release\))?!?: (release )?v[0-9]`. Take the first candidate whose subject matches. If no candidate's subject matches after exhausting the full list, fall back to the repository root commit (`git rev-list --max-parents=0 HEAD | head -1`). **No truncation:** The candidate list is not truncated (no `head` pipe); this avoids silently dropping the true release commit when many body-line false positives precede it. In practice this list is small (release commits are infrequent), so full iteration is cheap. The `--extended-regexp` pattern matches `chore: release v{x}` (no scope), `chore(release): v{x}` (scoped), `chore(release): release v{x}` (scoped with redundant prefix), and `chore(release)!: v{x}` (breaking-change marker). The `(\(release\))?` group restricts the scope to exactly `(release)` or no scope, preventing false positives from other scopes like `chore(deps): v2.0.0`. The `!?` allows an optional breaking-change indicator after the scope. The `(release )?v[0-9]` anchor excludes `chore(release): bump version` commits. **Limitation:** `git log --grep` matches any line in the commit message (subject + body), so the subject-verification step is required to avoid false positives from body lines like `chore: release v1.30.0 was the previous release`. Capture the match's date via `git log -1 --format=%Y-%m-%d {hash}` (fallback: empty string, which omits the `merged:>=` filter).
 - List merged PRs since that date: `gh pr list --state merged --base main --search "merged:>={date}" --json number,title,labels,body --limit 200`. If `gh` is not available or the command fails (auth error, network error), display "⚠ gh CLI unavailable — using commit-only mode" and skip PR collection. All changelog entries will come from the commit fallback.
 - If the PR count equals the `--limit` cap, display: "⚠ PR list may be truncated at 200. Older PRs could be missing — verify changelog completeness manually."
 - List first-parent commits since: `git log --first-parent {hash}..HEAD --oneline`. Using `--first-parent` excludes individual branch commits that were brought in by merge commits, preventing duplicate fallback entries for regular-merge PRs. These are used for the commit fallback.
@@ -54,8 +64,8 @@ Skip if `--skip-audit`.
 
 **Audit 2: Check changelog completeness.**
 - If CHANGELOG.md does not exist (Guard 5 dry-run path), treat all entries as undocumented and skip extraction.
-- Otherwise, extract [Unreleased] content.
-- For each merged PR, check if its number (`#N`) or title keywords appear in [Unreleased]. Classify as documented or undocumented.
+- Otherwise, check if a `## [{new-version}]` section already exists (from a previous aborted run). If so, extract its content for completeness checking. If not, all entries are undocumented.
+- For each merged PR, check if its number (`#N`) or title keywords appear in the extracted section. Classify as documented or undocumented.
 - For direct-push commits (not in any merged PR), check similarly.
 
 **Audit 3:** README staleness: compare command count (`ls commands/*.md | wc -l`), hook count, and modified-command table coverage against README.
@@ -66,7 +76,7 @@ Skip if `--skip-audit`.
 - **Dry-run gate:** If `--dry-run`, show all generated entries below but do NOT write any files. Display "○ Dry run — no changes written." after showing suggestions. Skip insertion.
 - **Changelog — PR-centric generation (primary):** For each undocumented merged PR, generate an entry from the PR title and body. Classify by PR title prefix or labels: `feat`→Added, `fix`→Fixed, `refactor`/`perf`/`chore`→Changed, `docs`→Changed, `test`→Changed. If the PR title has no recognized prefix and no classifying labels, default to `Changed`. Extract scope from the PR title prefix `{type}({scope}):` or from the primary area of the PR. Read the PR body/diff summary to write a concise description of what changed and why. Format: `- **\`{scope}\`** -- {description}. (PR #{number})`. Group entries under `### Added`, `### Changed`, `### Fixed` sub-headers matching the existing changelog style.
 - **Changelog — commit fallback:** For commits not covered by any merged PR (uncovered commits from Audit 1 correlation), generate entries by commit prefix (feat→Added, fix→Fixed, refactor/perf→Changed, no prefix→Changed). Format: `- **\`{scope}\`** -- {description}`.
-- **Insertion (non-dry-run only):** Show generated entries for review. If `[Unreleased]` was auto-created by Guard 5 or Guard 6 (empty section), insert entries automatically without confirmation since the section needs content. If `[Unreleased]` already had content, insert on user confirmation only.
+- **Insertion (non-dry-run only):** Show generated entries for review. **Stale section cleanup:** Before inserting, run `git fetch --tags --quiet`. If `git fetch --tags` exits non-zero (network failure, auth expired), display "⚠ Could not fetch tags from remote — skipping stale section cleanup to avoid deleting valid sections." and skip the entire stale cleanup step (proceed directly to insertion). If fetch succeeds, scan CHANGELOG for `## [{version}]` headers where `{version}` matches a semver pattern (`[0-9]+\.[0-9]+\.[0-9]+`), has no corresponding git tag (`git tag -l "v{version}"` returns empty), and `{version}` differs from `{new-version}`. Skip any header that doesn't match the semver pattern (treat as non-version content, e.g., `## [Overview]`). Remove each stale section (header through content until next `## [` or EOF). Display: "ℹ Removed stale changelog section for v{version} (untagged)." Create a `## [{new-version}] - {release-date}` section header and insert it with the generated entries directly above the first existing `## [x.y.z]` entry. If no version entries exist, insert after the last non-empty line following the `# Changelog` header. If a `## [{new-version}]` section already exists (from a previous aborted run), merge new entries into it on user confirmation only.
 - **README:** Show specific corrections, apply on confirmation.
 README corrections require explicit user confirmation.
 
@@ -99,29 +109,24 @@ Create and switch to release branch: `git checkout -b release/v{new-version}`
 --major/--minor: read VERSION, compute new version, write to all 4 files (VERSION, .claude-plugin/plugin.json, .claude-plugin/marketplace.json, marketplace.json).
 Neither flag: `bash scripts/bump-version.sh`. Capture new version.
 
-### Step 4: Update CHANGELOG header
-
-If [Unreleased] exists: replace with `## [{new-version}] - {YYYY-MM-DD}`. Display ✓.
-No [Unreleased]: display ○.
-
-### Step 5: Verify version sync
+### Step 4: Verify version sync
 
 `bash scripts/bump-version.sh --verify`. Fail → STOP: "Version sync failed after bump."
 
-### Step 6: Commit
+### Step 5: Commit
 
 Stage individually (only if modified): VERSION, .claude-plugin/plugin.json, .claude-plugin/marketplace.json, marketplace.json, CHANGELOG.md (if changed), README.md (if changed). Commit: `chore: release v{new-version}`
 
-### Step 7: Push release branch
+### Step 6: Push release branch
 
 --no-push: "○ Push skipped. Run `git push -u origin release/v{new-version}` when ready."
 Otherwise: `git push -u origin release/v{new-version}`. Display ✓.
 
-### Step 8: Open draft PR
+### Step 7: Open draft PR
 
 --no-push: skip. Otherwise: `gh pr create --base main --head release/v{new-version} --title "chore: release v{new-version}" --body "Release v{new-version}\n\nBumps version across all 4 files. Updates CHANGELOG.\n\nAfter merging, run \`/vbw:release --finalize\` to tag and create the GitHub release." --draft`. If gh unavailable/fails: "⚠ PR creation failed — create manually."
 
-### Step 9: Present summary
+### Step 8: Present summary
 
 Display task-level box with: version old→new, audit result, changelog status, commit hash, release branch name, push status, draft PR status, next step.
 
@@ -167,7 +172,7 @@ Otherwise: Extract changelog for this version from CHANGELOG.md. Auth resolution
 ### Finalize Step 4: Clean up release branch
 
 Delete local release branch if it still exists: `git branch -d release/v{version} 2>/dev/null || true`
-Delete remote release branch: `git push origin --delete release/v{version} 2>/dev/null || true`
+Delete remote release branch: `git push origin --delete release/v{version} 2>&1`. If stderr contains a not-found message (`remote ref does not exist`, `does not exist`, `not found`, `unable to delete.*not found`), treat as success (already gone). If deletion fails for another reason, display: "⚠ Could not delete remote branch `release/v{version}` — delete manually." This is non-fatal (release is already tagged); continue to Step 5 regardless.
 
 ### Finalize Step 5: Present summary
 
