@@ -491,3 +491,39 @@ extract_version_precompute() {
   # Must be non-fatal (release is already tagged)
   echo "$step4" | grep -qi 'non-fatal\|continue'
 }
+
+# --- Bug #174: Date format and tag check ---
+
+@test "audit 1 date extraction uses git format placeholder, not strftime" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Must NOT use --format=%Y-%m-%d (strftime specifiers, not git format)
+  # %Y is literal in git, %m is left/right mark, %d is ref decoration
+  ! echo "$audit1" | grep -q 'format=%Y-%m-%d'
+  ! echo "$audit1" | grep -q "format='%Y-%m-%d'"
+  # Must use a valid git date format: %cd with --date=short, or %ci piped through cut
+  echo "$audit1" | grep -qE '%cd.*--date=short|%ci'
+}
+
+@test "audit 5 stale section tag check warns about exit code pitfall" {
+  local audit5
+  audit5=$(extract_audit5)
+  # Must explicitly warn that git tag -l always exits 0
+  echo "$audit5" | grep -qi 'always exits 0\|exit code'
+  # Must instruct to check stdout content
+  echo "$audit5" | grep -qi 'stdout\|output.*empty'
+}
+
+@test "finalize guard 5 tag check warns about exit code pitfall" {
+  local finalize_guard
+  finalize_guard=$(awk '/^### Finalize Guard/{found=1; next} /^## /{found=0} found{print}' "$RELEASE_CMD")
+  [ -n "$finalize_guard" ]
+  # If Finalize Guard doesn't mention tag check, check full finalize section
+  if ! echo "$finalize_guard" | grep -qi 'git tag -l'; then
+    finalize_guard=$(awk '/^## Finalize Phase/{found=1; next} /^## [^F]/{found=0} found{print}' "$RELEASE_CMD")
+  fi
+  # Must explicitly warn that git tag -l always exits 0
+  echo "$finalize_guard" | grep -qi 'always exits 0\|exit code'
+  # Must instruct to check stdout content
+  echo "$finalize_guard" | grep -qi 'stdout\|non-empty\|outputs a match'
+}
