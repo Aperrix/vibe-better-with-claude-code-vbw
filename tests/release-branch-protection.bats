@@ -124,15 +124,17 @@ RELEASE_CMD="$REPO_ROOT/internal/release.md"
   echo "$guard_section" | grep -qi 'reject'
 }
 
-@test "guard checks remote branches for existing release branch" {
-  # Guard #7 must distinguish branch-exists vs remote lookup failure
+@test "guard auto-cleans existing release branches instead of stopping" {
+  # Guard #7 must auto-cleanup, not hard STOP
   local guard_section
   guard_section=$(awk '/^## Guard/{found=1; next} /^## [^G]/{found=0} found{print}' "$RELEASE_CMD")
   echo "$guard_section" | grep -qi 'git branch --list'
   echo "$guard_section" | grep -qi 'git ls-remote --heads origin'
   echo "$guard_section" | grep -qi 'Could not verify remote release branches'
   echo "$guard_section" | grep -qi 'origin.*unreachable\|unauthorized'
-  echo "$guard_section" | grep -qi 'Release branch already exists'
+  # Should describe cleanup, not "already exists" STOP
+  echo "$guard_section" | grep -qi 'cleanup\|clean up\|delet'
+  ! echo "$guard_section" | grep -qi 'STOP.*Release branch already exists'
 }
 
 @test "finalize commit search does not use --all-match" {

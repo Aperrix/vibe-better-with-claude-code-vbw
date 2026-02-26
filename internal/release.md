@@ -34,7 +34,12 @@ Git status:
 6. **Version sync:** `bash scripts/bump-version.sh --verify`. Out of sync → WARN but proceed (bump fixes it).
 7. **Existing release branch:** Check local first (`git branch --list 'release/v*'`) and remote second (`git ls-remote --heads origin 'refs/heads/release/v*'`).
    - If remote check exits non-zero (auth/network/repo failure) → STOP: "Could not verify remote release branches (`origin` unreachable or unauthorized). Fix remote access and retry."
-   - If local or remote checks return matches → STOP: "Release branch already exists (local or remote). Run `/vbw:release --finalize` after merging, or delete the stale branch."
+   - If local or remote checks return matches → **auto-cleanup** all stale release branches before proceeding. Collect all matching branch names (local + remote, deduplicated). For each `release/v{version}` branch:
+     - Find associated open PR: `gh pr list --state open --head release/v{version} --json number,state --limit 1`. If `gh` is unavailable, skip PR lookup and display: "⚠ gh CLI unavailable — deleting branch; check for orphaned PRs manually."
+     - Display: "⚠ Cleaning up stale release branch `release/v{version}` (PR #{N}, {state})" (or without PR info if `gh` unavailable).
+     - Delete local branch: `git branch -D release/v{version} 2>/dev/null || true`
+     - Delete remote branch: `git push origin --delete release/v{version} 2>/dev/null || true` (deleting the remote head branch auto-closes any associated PR on GitHub).
+   - Display cleanup summary: "ℹ Cleaned up {count} stale release branch(es). Proceeding with fresh release."
 
 ## Pre-release Audit
 
@@ -68,7 +73,7 @@ Compute `{new-version}` before the audit so changelog entries use the final vers
 - **Dry-run gate:** If `--dry-run`, show all generated entries below but do NOT write any files. Display "○ Dry run — no changes written." after showing suggestions. Skip insertion.
 - **Changelog — PR-centric generation (primary):** For each undocumented merged PR, generate an entry from the PR title and body. Classify by PR title prefix or labels: `feat`→Added, `fix`→Fixed, `refactor`/`perf`/`chore`→Changed, `docs`→Changed, `test`→Changed. If the PR title has no recognized prefix and no classifying labels, default to `Changed`. Extract scope from the PR title prefix `{type}({scope}):` or from the primary area of the PR. Read the PR body/diff summary to write a concise description of what changed and why. Format: `- **\`{scope}\`** -- {description}. (PR #{number})`. Group entries under `### Added`, `### Changed`, `### Fixed` sub-headers matching the existing changelog style.
 - **Changelog — commit fallback:** For commits not covered by any merged PR (uncovered commits from Audit 1 correlation), generate entries by commit prefix (feat→Added, fix→Fixed, refactor/perf→Changed, no prefix→Changed). Format: `- **\`{scope}\`** -- {description}`.
-- **Insertion (non-dry-run only):** Show generated entries for review. Create a `## [{new-version}] - {release-date}` section header and insert it with the generated entries directly above the first existing `## [x.y.z]` entry. If no version entries exist, insert after the last non-empty line following the `# Changelog` header. If a `## [{new-version}]` section already exists (from a previous aborted run), merge new entries into it on user confirmation only.
+- **Insertion (non-dry-run only):** Show generated entries for review. **Stale section cleanup:** Before inserting, scan CHANGELOG for any `## [{version}]` sections where `{version}` has no corresponding git tag (`git tag -l "v{version}"` returns empty) and `{version}` differs from `{new-version}`. Remove each stale section (header through content until next `## [` or EOF). Display: "ℹ Removed stale changelog section for v{version} (untagged)." Create a `## [{new-version}] - {release-date}` section header and insert it with the generated entries directly above the first existing `## [x.y.z]` entry. If no version entries exist, insert after the last non-empty line following the `# Changelog` header. If a `## [{new-version}]` section already exists (from a previous aborted run), merge new entries into it on user confirmation only.
 - **README:** Show specific corrections, apply on confirmation.
 README corrections require explicit user confirmation.
 

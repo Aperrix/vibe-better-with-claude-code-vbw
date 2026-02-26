@@ -254,7 +254,7 @@ bash scripts/bump-version.sh --verify
 
 Release is a two-phase, approval-gated workflow:
 
-1. Run `/vbw:release` to prepare `release/v{version}` and open a **draft** PR to `main`.
+1. Run `/vbw:release` to prepare `release/v{version}` and open a **draft** PR to `main`. If stale release branches exist from a previous run, the command automatically cleans them up before proceeding.
 2. Mark the PR ready for review and get required approvals from reviewers listed in `.github/CODEOWNERS` (source of truth).
 3. Merge the release PR to `main` under branch protection.
 4. On updated local `main`, run `/vbw:release --finalize` to create/push the tag and GitHub release.

@@ -106,11 +106,45 @@ extract_version_precompute() {
   echo "$guard6" | grep -qi 'bump-version\|sync'
 }
 
-@test "guard 7 is now existing release branch" {
+@test "guard 7 auto-cleans existing release branches" {
   local guard7
   guard7=$(extract_guard "7. Existing release branch")
   [ -n "$guard7" ]
-  echo "$guard7" | grep -qi 'release.*branch\|branch.*already'
+  # Should describe auto-cleanup, not hard STOP
+  echo "$guard7" | grep -qi 'cleanup\|clean up\|delet'
+  ! echo "$guard7" | grep -qi 'STOP.*already exists'
+}
+
+@test "guard 7 deletes local and remote branches" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'git branch -D\|git branch.*delete'
+  echo "$guard7" | grep -qi 'git push origin --delete'
+}
+
+@test "guard 7 finds associated PRs via gh" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'gh pr list'
+}
+
+@test "guard 7 handles gh CLI unavailability" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'gh.*unavailable\|gh.*not available\|orphan'
+}
+
+@test "guard 7 handles multiple release branches" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  # Must mention handling all/each release branch, not just one
+  echo "$guard7" | grep -qi 'each\|all\|every'
+}
+
+@test "guard 7 still stops on remote unreachable" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'STOP.*unreachable\|STOP.*unauthorized\|Could not verify'
 }
 
 # --- Audit 1: Change collection ---
@@ -275,6 +309,14 @@ extract_version_precompute() {
   echo "$audit5" | grep -q 'Added'
   echo "$audit5" | grep -q 'Changed'
   echo "$audit5" | grep -q 'Fixed'
+}
+
+@test "audit 5 removes stale untagged version sections from CHANGELOG" {
+  local audit5
+  audit5=$(extract_audit5)
+  # Audit 5 must scan for and remove stale version sections with no git tag
+  echo "$audit5" | grep -qi 'stale\|untagged\|no.*tag'
+  echo "$audit5" | grep -qi 'remov'
 }
 
 # --- Step 4: Removed (was header rename) ---
