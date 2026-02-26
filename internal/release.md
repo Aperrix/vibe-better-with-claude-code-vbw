@@ -38,19 +38,27 @@ Git status:
 
 Skip if `--skip-audit`.
 
-**Audit 1:** Find commits since last release: `git log --oneline --grep="chore: release" -1`, extract hash (fallback: root commit). List all commits since: `git log {hash}..HEAD --oneline`.
+**Audit 1: Collect changes since last release.**
+- Find last release commit: `git log --oneline --grep="chore: release" -1`, extract hash (fallback: root commit). Capture its date.
+- List merged PRs since that date: `gh pr list --state merged --base main --search "merged:>={date}" --json number,title,labels,body --limit 100`. These are the primary changelog source.
+- List all commits since: `git log {hash}..HEAD --oneline`. These are the fallback for direct-push commits not associated with a PR.
 
-**Audit 2:** Check changelog completeness. Extract [Unreleased] content. For each commit, check if scope/key terms appear. Classify as documented or undocumented.
+**Audit 2: Check changelog completeness.**
+- Extract [Unreleased] content.
+- For each merged PR, check if its number (`#N`) or title keywords appear in [Unreleased]. Classify as documented or undocumented.
+- For direct-push commits (not in any merged PR), check similarly.
 
 **Audit 3:** README staleness: compare command count (`ls commands/*.md | wc -l`), hook count, and modified-command table coverage against README.
 
-**Audit 4:** Display branded audit report: commit count, changelog coverage, undocumented commits (⚠), README staleness (⚠ or ✓).
+**Audit 4:** Display branded audit report: merged PR count, direct commit count, changelog coverage, undocumented PRs (⚠), undocumented commits (⚠), README staleness (⚠ or ✓).
 
 **Audit 5: Remediation** (if issues found):
-- **Changelog:** Generate entries by commit prefix (feat→Added, fix→Fixed, refactor/perf→Changed, other→Changed). Format: `- **\`{scope}\`** -- {description}`. Group entries under `### Added`, `### Changed`, `### Fixed` sub-headers matching the existing changelog style. Show for review. If `[Unreleased]` was auto-created by Guard 5 (empty section), insert entries automatically without confirmation since the section needs content. If `[Unreleased]` already had content, insert on user confirmation only.
+- **Changelog — PR-centric generation (primary):** For each undocumented merged PR, generate an entry from the PR title and body. Classify by PR title prefix or labels: `feat`→Added, `fix`→Fixed, `refactor`/`perf`/`chore`→Changed, `docs`→Changed, `test`→Changed. Extract scope from the PR title prefix `{type}({scope}):` or from the primary area of the PR. Read the PR body/diff summary to write a concise description of what changed and why. Format: `- **\`{scope}\`** -- {description}. (PR #{number})`. Group entries under `### Added`, `### Changed`, `### Fixed` sub-headers matching the existing changelog style.
+- **Changelog — commit fallback:** For direct-push commits not covered by any PR, generate entries by commit prefix (feat→Added, fix→Fixed, refactor/perf→Changed). Format: `- **\`{scope}\`** -- {description}`.
+- **Insertion:** Show generated entries for review. If `[Unreleased]` was auto-created by Guard 5 (empty section), insert entries automatically without confirmation since the section needs content. If `[Unreleased]` already had content, insert on user confirmation only.
 - **README:** Show specific corrections, apply on confirmation.
 - **Dry-run:** Show suggestions only, no writes: "○ Dry run -- no changes written."
-Both require explicit user confirmation.
+README corrections require explicit user confirmation.
 
 ---
 
