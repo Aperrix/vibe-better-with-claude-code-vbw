@@ -2,6 +2,29 @@
 
 All notable changes to VBW will be documented in this file.
 
+## [1.32.0] - 2026-02-26
+
+### Added
+
+- **`release`** -- Version bump now accounts for pending release branches. Computes bump base as highest of local, remote, and pending semver values with dry-run/no-push safety contracts preserved. (PR #178)
+- **`plugin`** -- Exclude release command from marketplace installs via `.claude-plugin/exclude` patterns. (PR #161)
+
+### Changed
+
+- **`gitignore`** -- Ignore `.claude` directory to keep user-local Claude Code state out of version control. (PR #158)
+
+### Fixed
+
+- **`release`** -- Correct git date format placeholders (`%cd --date=short` instead of `%Y-%m-%d`) and clarify tag existence checks to test stdout content rather than exit code. (PR #175)
+- **`release`** -- Robust grep pattern eliminates false positives from `[Unreleased]` section indirection; changelog entries now target versioned headers directly. (PR #173)
+- **`release`** -- Auto-create versioned changelog section and populate from merged PRs and commits when section is missing. (PR #170)
+- **`release`** -- Two-phase prepare/finalize workflow respects branch protection rules by using draft PRs instead of direct pushes to main. (PR #163)
+- **`commands`** -- Add symlink fallback and robust grep pattern for plugin root resolution when `CLAUDE_PLUGIN_ROOT` is unset. (PR #168)
+- **`commands`** -- Add phase-detect fallback to prevent template-block race condition when phase-detect.sh runs concurrently. (PR #165)
+- **`commands`** -- Revert session-key from SHA1 to deterministic value and inject `session_id` from hook stdin for reliable session tracking. (PR #154)
+- **`planning`** -- Enforce deterministic plan filename convention (`PLAN.md`) to prevent naming drift across phases. (PR #164)
+- **`auto-uat`** -- Trigger verification mid-milestone before continuing execution, ensuring UAT gates are not bypassed. (PR #149)
+
 ## [1.31.0] - 2026-02-23
 
 ### Added
