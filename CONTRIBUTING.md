@@ -137,7 +137,7 @@ Less good candidates:
 3. Describe what changed and why. Include before/after if relevant.
 4. Ensure `claude --plugin-dir "<path-to-vbw-clone>"` loads without errors.
 5. Test your changes against at least one real project (not the VBW repo itself).
-6. **Run QA review before marking ready.** Repeat this cycle at least 2–4 times:
+6. **Run QA review before marking ready.** Repeat this cycle at least 3 times (or until the latest report contains no confirmed critical/major issues):
 
    > **Docs-only or trivial PRs:** The QA round requirement only applies when the PR touches plugin logic paths (`agents/`, `commands/`, `config/`, `hooks/`, `references/`, `scripts/`, `templates/`, `testing/`, `tests/`). PRs that only change docs, CI config, or repo metadata skip the check automatically.
 
