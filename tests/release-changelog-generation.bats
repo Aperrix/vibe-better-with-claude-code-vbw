@@ -128,10 +128,28 @@ extract_version_precompute() {
   echo "$guard7" | grep -qi 'gh pr list'
 }
 
-@test "guard 7 handles gh CLI unavailability" {
+@test "guard 7 handles gh CLI unavailability or failure" {
   local guard7
   guard7=$(extract_guard "7. Existing release branch")
   echo "$guard7" | grep -qi 'gh.*unavailable\|gh.*not available\|orphan'
+  # Must also handle gh returning non-zero (auth/network/API failure)
+  echo "$guard7" | grep -qi 'non-zero\|exit.*fail\|command.*fail\|exits non-zero'
+}
+
+@test "guard 7 reports deletion failures instead of suppressing" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  # Must track and report deletion failures, not suppress with || true
+  echo "$guard7" | grep -qi 'fail.*delet\|delet.*fail\|Failed to delete'
+  ! echo "$guard7" | grep -q '|| true'
+  # Must have failure counters or tracking
+  echo "$guard7" | grep -qi 'failed.*>.*0\|{failed}'
+}
+
+@test "guard 7 stops when all deletions fail" {
+  local guard7
+  guard7=$(extract_guard "7. Existing release branch")
+  echo "$guard7" | grep -qi 'STOP.*All branch deletions failed\|All.*deletions failed.*STOP'
 }
 
 @test "guard 7 handles multiple release branches" {
@@ -157,14 +175,24 @@ extract_version_precompute() {
   echo "$audit1" | grep -q 'git log'
 }
 
-@test "audit 1 grep pattern matches both commit formats" {
+@test "audit 1 grep pattern matches all release commit formats" {
   local audit1
   audit1=$(extract_audit1)
-  # Must use a pattern that matches both:
-  #   chore: release v1.32.0    (no scope)
-  #   chore(release): v1.31.0   (scoped)
-  # The old pattern "chore: release" missed the scoped format
-  echo "$audit1" | grep -q '\^chore.*release'
+  # Must use a pattern that matches all three known formats:
+  #   chore: release v1.32.0          (no scope)
+  #   chore(release): v1.31.0         (scoped)
+  #   chore(release): release v1.21.31 (scoped with redundant prefix)
+  # But excludes:
+  #   chore(release): bump version to 1.31.0  (version bump, not release cut)
+  echo "$audit1" | grep -q 'extended-regexp\|extended.regexp'
+  echo "$audit1" | grep -q '(release )?v\[0-9\]\|(release )\\?v'
+}
+
+@test "audit 1 grep pattern excludes version bump commits" {
+  local audit1
+  audit1=$(extract_audit1)
+  # Explanation must document that bump commits are excluded
+  echo "$audit1" | grep -qi 'bump.*exclud\|exclud.*bump'
 }
 
 @test "audit 1 grep pattern excludes fix(release) commits" {
@@ -317,6 +345,19 @@ extract_version_precompute() {
   # Audit 5 must scan for and remove stale version sections with no git tag
   echo "$audit5" | grep -qi 'stale\|untagged\|no.*tag'
   echo "$audit5" | grep -qi 'remov'
+}
+
+@test "audit 5 fetches tags before stale section check" {
+  local audit5
+  audit5=$(extract_audit5)
+  echo "$audit5" | grep -qi 'git fetch --tags\|fetch.*tags'
+}
+
+@test "audit 5 stale section cleanup uses semver pattern matching" {
+  local audit5
+  audit5=$(extract_audit5)
+  # Must validate version headers match semver pattern to avoid false positives
+  echo "$audit5" | grep -qi 'semver\|\[0-9\].*\..*\[0-9\]'
 }
 
 # --- Step 4: Removed (was header rename) ---
