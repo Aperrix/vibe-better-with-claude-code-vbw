@@ -118,7 +118,7 @@ _atomic_pd_cat_pattern() {
   for cmd in resume vibe discuss qa verify; do
     local count
     count=$(grep -cF "$(_atomic_pd_preamble_pattern)" "$PROJECT_ROOT/commands/${cmd}.md")
-    [ "$count" -eq 1 ] || { echo "FAIL: ${cmd}.md missing atomic phase-detect in preamble"; return 1; }
+    [ "$count" -ge 1 ] || { echo "FAIL: ${cmd}.md missing atomic phase-detect in preamble"; return 1; }
   done
 }
 

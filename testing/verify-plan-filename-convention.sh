@@ -613,7 +613,7 @@ else
 fi
 
 # Test 54: verify.md uses deterministic misnamed_plans condition (not inferential)
-if grep -q 'misnamed_plans=true' "$SCRIPT_DIR/commands/verify.md" | head -1 && \
+if grep -q 'misnamed_plans=true' "$SCRIPT_DIR/commands/verify.md" && \
    grep -q 'initial Phase state contained.*misnamed_plans=true' "$SCRIPT_DIR/commands/verify.md"; then
   pass "verify.md uses deterministic misnamed_plans condition for regeneration"
 else
