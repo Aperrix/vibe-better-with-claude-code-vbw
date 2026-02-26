@@ -59,6 +59,11 @@ Shipped milestones:
   fi
   ```
   Display: "⚠ Renamed misnamed plan files to `{NN}-PLAN.md` convention."
+  Then re-run phase-detect.sh to refresh state (filenames changed):
+  ```bash
+  bash "/tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}/scripts/phase-detect.sh" > "/tmp/.vbw-phase-detect-${CLAUDE_SESSION_ID:-default}.txt"
+  ```
+  Use the refreshed phase-detect output for all subsequent steps.
 - No ROADMAP.md or has template placeholders: STOP "No roadmap found. Run /vbw:vibe to set up your project."
 
 ## Steps

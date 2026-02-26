@@ -581,6 +581,108 @@ else
   fail "verify.md SUMMARY check should come after auto-detect phase"
 fi
 
+# --- Post-normalization refresh parity tests ---
+echo ""
+echo "Post-normalization phase-detect refresh parity:"
+
+# Test 51: status.md refreshes phase-detect after normalization
+NORM_LINE_S=$(grep -n 'normalize-plan-filenames' "$SCRIPT_DIR/commands/status.md" | head -1 | cut -d: -f1)
+REFRESH_LINE_S=$(grep -n 'phase-detect.sh' "$SCRIPT_DIR/commands/status.md" | grep -v 'Context\|context\|Plugin root' | tail -1 | cut -d: -f1)
+if [ -n "$NORM_LINE_S" ] && [ -n "$REFRESH_LINE_S" ] && [ "$REFRESH_LINE_S" -gt "$NORM_LINE_S" ]; then
+  pass "status.md refreshes phase-detect after normalization"
+else
+  fail "status.md missing post-normalization phase-detect refresh"
+fi
+
+# Test 52: resume.md refreshes phase-detect after normalization
+NORM_LINE_R=$(grep -n 'normalize-plan-filenames' "$SCRIPT_DIR/commands/resume.md" | head -1 | cut -d: -f1)
+REFRESH_LINE_R=$(grep -n 're-run phase-detect' "$SCRIPT_DIR/commands/resume.md" | head -1 | cut -d: -f1)
+if [ -n "$NORM_LINE_R" ] && [ -n "$REFRESH_LINE_R" ] && [ "$REFRESH_LINE_R" -gt "$NORM_LINE_R" ]; then
+  pass "resume.md refreshes phase-detect after normalization"
+else
+  fail "resume.md missing post-normalization phase-detect refresh"
+fi
+
+# Test 53: qa.md refreshes phase-detect after normalization
+NORM_LINE_Q=$(grep -n 'normalize-plan-filenames' "$SCRIPT_DIR/commands/qa.md" | head -1 | cut -d: -f1)
+REFRESH_LINE_Q=$(grep -n 'phase-detect.sh' "$SCRIPT_DIR/commands/qa.md" | grep -v 'Context\|context\|Plugin root' | tail -1 | cut -d: -f1)
+if [ -n "$NORM_LINE_Q" ] && [ -n "$REFRESH_LINE_Q" ] && [ "$REFRESH_LINE_Q" -gt "$NORM_LINE_Q" ]; then
+  pass "qa.md refreshes phase-detect after normalization"
+else
+  fail "qa.md missing post-normalization phase-detect refresh"
+fi
+
+# Test 54: verify.md uses deterministic misnamed_plans condition (not inferential)
+if grep -q 'misnamed_plans=true' "$SCRIPT_DIR/commands/verify.md" | head -1 && \
+   grep -q 'initial Phase state contained.*misnamed_plans=true' "$SCRIPT_DIR/commands/verify.md"; then
+  pass "verify.md uses deterministic misnamed_plans condition for regeneration"
+else
+  fail "verify.md regeneration condition is inferential (should reference misnamed_plans=true)"
+fi
+
+# Test 55: all normalization-aware commands instruct using refreshed output
+for cmd in status resume verify qa; do
+  if grep -q 'refreshed.*phase-detect\|refreshed.*output\|Use the refreshed' "$SCRIPT_DIR/commands/$cmd.md"; then
+    pass "$cmd.md instructs using refreshed phase-detect output"
+  else
+    fail "$cmd.md missing instruction to use refreshed phase-detect output"
+  fi
+done
+
+# --- Behavioral: end-to-end phase-state refresh after normalization ---
+echo ""
+echo "Behavioral state-refresh tests:"
+
+# Test 56: phase-detect shows correct plan/summary counts after normalization
+TDIR="$TMPDIR_TEST/test56"
+mkdir -p "$TDIR/.vbw-planning/phases/01-setup"
+cat > "$TDIR/.vbw-planning/PROJECT.md" << 'EOF'
+# Test Project
+This is a test project.
+EOF
+echo "plan" > "$TDIR/.vbw-planning/phases/01-setup/PLAN-01.md"
+echo "plan2" > "$TDIR/.vbw-planning/phases/01-setup/PLAN-02.md"
+echo "summary" > "$TDIR/.vbw-planning/phases/01-setup/SUMMARY-01.md"
+# Before normalization: misnamed, and plan/summary counts should track
+OUTPUT_BEFORE=$(cd "$TDIR" && bash "$SCRIPT_DIR/scripts/phase-detect.sh" 2>/dev/null)
+PLANS_BEFORE=$(echo "$OUTPUT_BEFORE" | grep '^next_phase_plans=' | cut -d= -f2)
+SUMMARIES_BEFORE=$(echo "$OUTPUT_BEFORE" | grep '^next_phase_summaries=' | cut -d= -f2)
+# Normalize
+bash "$NORM_SCRIPT" "$TDIR/.vbw-planning/phases/01-setup" >/dev/null 2>&1
+# After normalization: clean, counts should be preserved
+OUTPUT_AFTER=$(cd "$TDIR" && bash "$SCRIPT_DIR/scripts/phase-detect.sh" 2>/dev/null)
+PLANS_AFTER=$(echo "$OUTPUT_AFTER" | grep '^next_phase_plans=' | cut -d= -f2)
+SUMMARIES_AFTER=$(echo "$OUTPUT_AFTER" | grep '^next_phase_summaries=' | cut -d= -f2)
+MISNAMED_AFTER=$(echo "$OUTPUT_AFTER" | grep '^misnamed_plans=' | cut -d= -f2)
+if [ "$PLANS_AFTER" = "2" ] && [ "$SUMMARIES_AFTER" = "1" ] && [ "$MISNAMED_AFTER" = "false" ]; then
+  pass "phase-detect counts preserved after normalization (plans=$PLANS_AFTER, summaries=$SUMMARIES_AFTER)"
+else
+  fail "phase-detect counts wrong after normalization — plans=$PLANS_AFTER (want 2), summaries=$SUMMARIES_AFTER (want 1), misnamed=$MISNAMED_AFTER (want false)"
+fi
+
+# Test 57: phase-detect next_phase_state transitions correctly after normalization
+TDIR="$TMPDIR_TEST/test57"
+mkdir -p "$TDIR/.vbw-planning/phases/01-setup" "$TDIR/.vbw-planning/phases/02-impl"
+cat > "$TDIR/.vbw-planning/PROJECT.md" << 'EOF'
+# Test Project
+This is a test project.
+EOF
+printf '%s\n' '# Roadmap' '' '## Phase 01: Setup' '- Status: complete' '' '## Phase 02: Implementation' '- Status: not started' > "$TDIR/.vbw-planning/ROADMAP.md"
+echo "plan" > "$TDIR/.vbw-planning/phases/01-setup/PLAN-01.md"
+echo "done" > "$TDIR/.vbw-planning/phases/01-setup/SUMMARY-01.md"
+# misnamed plans in phase 01, phase 02 empty
+OUTPUT_BEFORE=$(cd "$TDIR" && bash "$SCRIPT_DIR/scripts/phase-detect.sh" 2>/dev/null)
+MISNAMED_B=$(echo "$OUTPUT_BEFORE" | grep '^misnamed_plans=' | cut -d= -f2)
+bash "$NORM_SCRIPT" "$TDIR/.vbw-planning/phases/01-setup" >/dev/null 2>&1
+OUTPUT_AFTER=$(cd "$TDIR" && bash "$SCRIPT_DIR/scripts/phase-detect.sh" 2>/dev/null)
+MISNAMED_A=$(echo "$OUTPUT_AFTER" | grep '^misnamed_plans=' | cut -d= -f2)
+STATE_A=$(echo "$OUTPUT_AFTER" | grep '^next_phase_state=' | cut -d= -f2)
+if [ "$MISNAMED_B" = "true" ] && [ "$MISNAMED_A" = "false" ]; then
+  pass "normalization clears misnamed_plans flag across phases"
+else
+  fail "misnamed_plans flag not cleared — before=$MISNAMED_B, after=$MISNAMED_A, state=$STATE_A"
+fi
+
 echo ""
 echo "==============================="
 echo "Plan filename convention: $PASS passed, $FAIL failed"
