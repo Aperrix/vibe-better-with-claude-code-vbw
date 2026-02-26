@@ -311,6 +311,48 @@ else
   fail "$sha1_session_count SHA1 session key derivation(s) still present in commands"
 fi
 
+# Check 13: All command preambles include symlink fallback for plugin root resolution
+# The hooks.json resolution pattern includes a glob over /tmp/.vbw-plugin-root-link-*
+# as a fallback. Commands must also include this fallback to resolve the plugin root
+# when CLAUDE_PLUGIN_ROOT is unset and marketplace cache is empty.
+for rel in "${TARGET_COMMANDS[@]}"; do
+  file="$COMMANDS_DIR/$rel"
+  base="$(basename "$rel" .md)"
+  if grep -qF '/tmp/.vbw-plugin-root-link-*/scripts/hook-wrapper.sh' "$file"; then
+    pass "$base: preamble includes symlink glob fallback"
+  else
+    fail "$base: preamble MISSING symlink glob fallback (/tmp/.vbw-plugin-root-link-*)"
+  fi
+done
+
+# Check 13b: execute-protocol.md includes symlink glob fallback
+if grep -qF '/tmp/.vbw-plugin-root-link-*/scripts/hook-wrapper.sh' "$EXECUTE_PROTOCOL"; then
+  pass "execute-protocol: includes symlink glob fallback"
+else
+  fail "execute-protocol: MISSING symlink glob fallback"
+fi
+
+# Check 14: All command preambles use robust grep -oE for ps extraction (not fragile sed)
+# The old sed pattern: sed -n 's/.*--plugin-dir  *\([^ ]*\).*/\1/p'
+# is whitespace-sensitive and breaks with different spacing. The hooks.json pattern:
+# grep -oE -- "--plugin-dir [^ ]+" is more robust.
+for rel in "${TARGET_COMMANDS[@]}"; do
+  file="$COMMANDS_DIR/$rel"
+  base="$(basename "$rel" .md)"
+  if grep -q 'sed.*--plugin-dir' "$file"; then
+    fail "$base: uses fragile sed pattern for --plugin-dir extraction"
+  else
+    pass "$base: does not use fragile sed pattern"
+  fi
+done
+
+# Check 14b: execute-protocol.md uses robust grep pattern
+if grep -q 'sed.*--plugin-dir' "$EXECUTE_PROTOCOL"; then
+  fail "execute-protocol: uses fragile sed pattern for --plugin-dir extraction"
+else
+  pass "execute-protocol: does not use fragile sed pattern"
+fi
+
 echo ""
 echo "==============================="
 echo "TOTAL: $PASS PASS, $FAIL FAIL"
