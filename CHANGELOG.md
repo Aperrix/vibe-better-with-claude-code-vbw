@@ -2,6 +2,12 @@
 
 All notable changes to VBW will be documented in this file.
 
+## [1.32.2] - 2026-02-26
+
+### Fixed
+
+- **`release`** -- Finalize Step 4 now checks remote branch existence before attempting deletion, preventing spurious error output when the branch was already removed by PR merge. (PR #184)
+
 ## [1.32.1] - 2026-02-26
 
 ### Fixed
