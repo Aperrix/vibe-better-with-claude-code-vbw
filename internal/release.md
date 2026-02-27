@@ -134,34 +134,54 @@ Otherwise: `git push -u origin release/v{new-version}`. Display ✓.
 
 --no-push: skip. Otherwise: `gh pr create --base main --head release/v{new-version} --title "chore: release v{new-version}" --body "Release v{new-version}\n\nBumps version across all 4 files. Updates CHANGELOG.\n\nAfter merging, run \`/vbw:release --finalize\` to tag and create the GitHub release." --draft`. If gh unavailable/fails: "⚠ PR creation failed — create manually."
 
-### Step 8: Present summary
+### Step 8: Return to main
+
+After the release branch is pushed and the draft PR is opened (or after commit if `--no-push`), switch back to `main` so the user is not left on the release branch:
+
+`git checkout main`
+
+This is a convenience step — finalize requires being on `main`, and leaving the user on the release branch after prepare is confusing. If the checkout fails (e.g., dirty tree from a concurrent edit), display: "⚠ Could not switch back to main. Run `git checkout main` manually before finalizing." This is non-fatal; continue to the summary.
+
+### Step 9: Present summary
 
 Display task-level box with: version old→new, audit result, changelog status, commit hash, release branch name, push status, draft PR status, next step.
 
-Include: "Next: merge the PR, then run `/vbw:release --finalize` to tag and create the GitHub release."
+- If `--no-push` was used: Include: "Next: push the release branch (`git push -u origin release/v{new-version}`), create a draft PR (`gh pr create --base main --head release/v{new-version} --title 'chore: release v{new-version}' --draft`), then run `/vbw:release --finalize` to merge the PR, tag, and create the GitHub release."
+- Otherwise: Include: "Next: run `/vbw:release --finalize` to merge the PR, tag, and create the GitHub release."
 
 ---
 
 ## Finalize Phase (`--finalize`)
 
-Run after the release PR has been merged into `main`. Tags the exact release commit and creates the GitHub release.
+Merges the release PR, tags the release commit, and creates the GitHub release. Handles the full lifecycle from draft PR to published release.
 
 ### Finalize Guard
 
-1. **Must be on main:** If current branch is not `main` → STOP: "Must be on main to finalize. Currently on `{branch}`."
+1. **Must be on main:** If current branch is not `main` → STOP: "Must be on main to finalize. Currently on `{branch}`. Run `git checkout main` first."
 2. **Dirty tree:** If `git status --porcelain` shows uncommitted changes → STOP: "Working tree is dirty. Commit or stash changes before finalizing."
-3. **Pull latest:** `git pull origin main` to ensure the merge commit is local.
-4. **Locate merged release artifact on main:** Read VERSION to get `{version}`.
+3. **Pull latest:** `git pull origin main` to ensure the latest state is local. If the pull fails (network, auth, rebase conflict) → STOP: "Could not pull latest main. Check network/auth and re-run --finalize."
+4. **Merge release PR (if not yet merged):** Find any open release PR:
+   - Find the PR: `gh pr list --state open --json number,headRefName,state,isDraft --limit 100` and filter results for entries where `headRefName` starts with `release/v`. Extract `{version}` from the matching branch name (strip `release/v` prefix) and `{number}` from the PR. If multiple release PRs are found, use the one with the highest semver version. The `--limit 100` ensures the release PR is found even in repos with many open PRs (dependabot, stacked PRs, etc.).
+   - If no open release PR is found: Check whether a merged release PR exists: `gh pr list --state merged --json headRefName --limit 50` and filter for entries where `headRefName` starts with `release/v`. If a merged release PR is found (or `gh` is unavailable), read VERSION to get `{version}` and continue to Guard 5. If no merged release PR is found either → STOP: "No open or merged release PR found. Did you run --prepare and push the release branch? For --no-push flow, create a draft PR first (see prepare Step 9 output)."
+   - If an open release PR is found:
+     - **Mark ready:** If `isDraft` is true, convert it: `gh pr ready {number}`. If `gh pr ready` fails (permissions, network) → STOP: "Could not mark PR #{number} as ready for review. Check permissions and re-run --finalize." Display on success: "✓ PR #{number} marked ready for review." If `isDraft` is false, skip (already ready).
+     - **Wait for checks:** Poll status checks: `gh pr checks {number} --watch --interval 10`. This blocks until all required checks complete or fail. If any check fails → STOP: "Status checks failed on PR #{number}. Fix the failures and re-run --finalize." **Timeout note:** `gh pr checks --watch` has no native timeout. If a check is stuck (queued runner, GitHub outage), this will block indefinitely. The user can Ctrl+C to abort and re-run `--finalize` later. If the repo has no required status checks, `--watch` returns immediately (success).
+     - **Merge:** `gh pr merge {number} --merge --delete-branch`. This merges the PR and deletes the remote release branch. Display: "✓ PR #{number} merged into main." If `gh pr merge` fails → STOP: "Could not merge PR #{number}. Check for merge conflicts, required reviews, or branch protection rules, then re-run --finalize."
+     - **Pull the merge commit:** `git pull origin main` to bring the merge commit local. If the pull fails (network, rebase conflict) → STOP: "Could not pull merge commit from main. Check network/auth and re-run --finalize."
+   - **Merge queue note:** `gh pr merge` is synchronous for standard merge strategies and returns after the merge commit exists on `main`. However, if the repo uses a GitHub merge queue, `gh pr merge` enqueues the PR and returns success before the actual merge happens. A subsequent `git pull` may not find the merge commit yet. VBW does not currently support merge queue repos. If `gh pr merge` returns success but the subsequent `git pull` does not bring a merge commit for the release branch → STOP: "Merge queue detected: PR was enqueued but not yet merged. VBW does not support merge queue repos. Wait for the queue to merge the PR, then re-run --finalize."
+   - If `gh` is unavailable or the command fails (and no more specific STOP was triggered above) → STOP: "gh CLI unavailable or failed. Merge PR manually, then re-run --finalize."
+   - If the PR count equals the `--limit` cap (100), display: "⚠ Open PR list may be truncated. If the release PR exists but was not found, merge it manually and re-run --finalize."
+5. **Locate merged release artifact on main:** Pull latest to close any race where the PR was merged between Guard 3 and Guard 4: `git pull origin main`. If the pull fails (network, auth, rebase conflict) → STOP: "Could not pull latest main. Check network/auth and re-run --finalize." Then re-read VERSION to get `{version}`.
    - **Primary path (merge commit):** Search first-parent `main` history for merge commits referencing `release/v{version}`: `git log main --first-parent --grep="Merge pull request .*release/v{version}" --format="%H"`.
      - Exactly one match → store as `{release_sha}`.
      - More than one match → STOP: "Multiple merge commits found for release/v{version}. Resolve manually before finalizing."
    - **Fallback path (squash/rebase):** If no merge-commit match, search first-parent `main` history for commit subject prefix `chore: release v{version}`: `git log main --first-parent --grep="^chore: release v{version}" --format="%H"`.
-     - Zero matches → STOP: "Release commit for v{version} not found on main. Was the PR merged?"
+     - Zero matches → STOP: "Release commit for v{version} not found on main. Was the PR merged? (Or, if committed directly to main, does the commit message match `chore: release v{version}`?)"
      - More than one match → STOP: "Multiple release commits match v{version} on main. Resolve ambiguity manually before finalizing."
      - Exactly one match → store as `{release_sha}`.
 
 > **Merge strategy note:** `--first-parent` ensures finalize tags the merged release artifact on `main` (merge commit for merge strategy, squash commit for squash strategy), not a pre-merge branch commit. This avoids ambiguous tagging when extra commits were added on `release/v{version}` before merge.
-5. **Tag already exists:** If `git tag -l "v{version}"` outputs a match (note: `git tag -l` always exits 0 regardless of matches — check that stdout is non-empty, not the exit code), check if it points to `{release_sha}` (`git rev-parse "v{version}^{commit}"`). If it matches → skip tagging, continue to Step 2. If it points elsewhere → STOP: "Tag v{version} already exists but points to a different commit. Resolve manually."
+6. **Tag already exists:** If `git tag -l "v{version}"` outputs a match (note: `git tag -l` always exits 0 regardless of matches — check that stdout is non-empty, not the exit code), check if it points to `{release_sha}` (`git rev-parse "v{version}^{commit}"`). If it matches → skip tagging, continue to Step 2. If it points elsewhere → STOP: "Tag v{version} already exists but points to a different commit. Resolve manually."
 
 ### Finalize Step 1: Tag release commit
 
@@ -176,12 +196,18 @@ Otherwise: `git push origin v{version}`. Display ✓.
 ### Finalize Step 3: GitHub Release
 
 If release already exists (`gh release view v{version} &>/dev/null` succeeds) → display "○ GitHub release already exists." and skip.
-Otherwise: Extract changelog for this version from CHANGELOG.md. Auth resolution (try in order): (1) `gh auth token` — preferred, uses gh CLI's native auth; (2) extract token from git remote URL (`https://user:TOKEN@github.com/...`), set as `GH_TOKEN` env prefix; (3) existing `GH_TOKEN` env var. Run `gh release create v{version} --title "v{version}" --notes "{content}"`. If gh unavailable/fails: "⚠ GitHub release failed — create manually."
+Otherwise: Extract changelog for this version from CHANGELOG.md using `awk` (NOT `sed` — BSD sed on macOS does not support the needed regex syntax):
+```
+awk '/^## \[{version}\]/{found=1; next} /^## \[/{if(found) exit} found{print}' CHANGELOG.md
+```
+Replace `{version}` with the literal version string (e.g., `1.32.0`). The awk command prints all lines between the target version header and the next version header, excluding both headers. **Never use `sed` for changelog extraction** — the regex range syntax required is not portable across GNU sed and BSD sed.
+
+Auth resolution (try in order): (1) `gh auth token` — preferred, uses gh CLI's native auth; (2) extract token from git remote URL (`https://user:TOKEN@github.com/...`), set as `GH_TOKEN` env prefix; (3) existing `GH_TOKEN` env var. Run `gh release create v{version} --title "v{version}" --notes "{content}"`. If gh unavailable/fails: "⚠ GitHub release failed — create manually."
 
 ### Finalize Step 4: Clean up release branch
 
 Delete local release branch if it still exists: `git branch -d release/v{version} 2>/dev/null || true`
-Delete remote release branch: `git push origin --delete release/v{version} 2>&1`. If stderr contains a branch-not-found message (`remote ref does not exist`, `does not exist`, `unable to delete.*not found`), treat as success (already gone). Do not match bare `not found` (too broad — see Guard 7 classification note). If deletion fails for another reason, display: "⚠ Could not delete remote branch `release/v{version}` — delete manually." This is non-fatal (release is already tagged); continue to Step 5 regardless.
+Delete remote release branch (if not already deleted by `gh pr merge --delete-branch` in Guard 4): `git push origin --delete release/v{version} 2>&1`. If stderr contains a branch-not-found message (`remote ref does not exist`, `does not exist`, `unable to delete.*not found`), treat as success (already gone — likely deleted by the PR merge step). Do not match bare `not found` (too broad — see Guard 7 classification note). If deletion fails for another reason, display: "⚠ Could not delete remote branch `release/v{version}` — delete manually." This is non-fatal (release is already tagged); continue to Step 5 regardless.
 
 ### Finalize Step 5: Present summary
 
