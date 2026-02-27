@@ -2,6 +2,12 @@
 
 All notable changes to VBW will be documented in this file.
 
+## [1.32.1] - 2026-02-26
+
+### Fixed
+
+- **`release`** -- Finalize now auto-merges the release PR (marks ready, waits for checks, merges, pulls) instead of requiring manual GitHub merge. Prepare returns to main after pushing release branch. Changelog extraction uses awk instead of sed for macOS compatibility. (PR #181)
+
 ## [1.32.0] - 2026-02-26
 
 ### Added
