@@ -2,7 +2,7 @@
 # Split from ci.yml so that PR body edits (the `edited` event) only re-run this
 # lightweight check — not the full lint/test/QA matrix. Avoids the classic branch
 # protection issue where skipped required checks block merges.
-name: CI
+name: Linked Issue
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   linked-issue-check:
-    name: Linked Issue
+    name: Linked Issue Check
     runs-on: ubuntu-latest
     steps:
       - name: Check for linked issue
@@ -22,27 +22,44 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          # Strip HTML comments so refs inside <!-- ... --> are not matched
+          CLEAN_BODY=$(printf '%s\n' "$PR_BODY" | sed 's/<!--.*-->//g' | sed '/<!--/,/-->/d')
+
           # Method 1: Check PR body for issue references
           # Matches: Fixes #N, Closes #N, Resolves #N (with optional owner/repo prefix)
           # Also matches standalone #N references and full GitHub issue URLs
           body_has_ref=false
           body_detail=""
 
-          if printf '%s\n' "$PR_BODY" | grep -qiE '(fix(es|ed)?|close[sd]?|resolve[sd]?)\s+([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+)?#[1-9][0-9]*\b'; then
+          # Closing keywords (Fixes/Closes/Resolves #N)
+          kw_matches=$(printf '%s\n' "$CLEAN_BODY" | grep -ioE '(fix(es|ed)?|close[sd]?|resolve[sd]?)\s+([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+)?#[1-9][0-9]*\b' | sort -u | tr '\n' ' ')
+          if [ -n "$kw_matches" ]; then
             body_has_ref=true
-            body_detail=$(printf '%s\n' "$PR_BODY" | grep -ioE '(fix(es|ed)?|close[sd]?|resolve[sd]?)\s+([a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+)?#[1-9][0-9]*\b' | sort -u | tr '\n' ' ')
-          elif printf '%s\n' "$PR_BODY" | grep -qE 'https://github\.com/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+/issues/[1-9][0-9]*\b'; then
+            body_detail="$kw_matches"
+          fi
+
+          # Full GitHub issue URLs
+          url_matches=$(printf '%s\n' "$CLEAN_BODY" | grep -oE 'https://github\.com/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+/issues/[1-9][0-9]*\b' | sort -u | tr '\n' ' ')
+          if [ -n "$url_matches" ]; then
             body_has_ref=true
-            body_detail=$(printf '%s\n' "$PR_BODY" | grep -oE 'https://github\.com/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+/issues/[1-9][0-9]*\b' | sort -u | tr '\n' ' ')
-          elif printf '%s\n' "$PR_BODY" | grep -qE '(^|[^#&a-zA-Z0-9])#[1-9][0-9]*\b'; then
+            body_detail="${body_detail:+$body_detail}$url_matches"
+          fi
+
+          # Bare #N references (cap at 5 digits to avoid hex color false positives)
+          bare_matches=$(printf '%s\n' "$CLEAN_BODY" | grep -oE '(^|[^#&a-zA-Z0-9])#[1-9][0-9]{0,4}\b' | grep -oE '#[1-9][0-9]{0,4}' | sort -u | tr '\n' ' ')
+          if [ -n "$bare_matches" ]; then
             body_has_ref=true
-            body_detail=$(printf '%s\n' "$PR_BODY" | grep -oE '(^|[^#&a-zA-Z0-9])#[1-9][0-9]*\b' | grep -oE '#[1-9][0-9]*' | sort -u | tr '\n' ' ')
+            body_detail="${body_detail:+$body_detail}$bare_matches"
           fi
 
           # Method 2: Check GitHub timeline for sidebar-linked issues
+          # Subtract disconnected events so unlinking an issue is respected
           sidebar_linked=false
           sidebar_detail=""
-          if timeline_json=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/timeline" --paginate --jq '[.[] | select(.event == "connected") | .source.issue.number // empty] | unique | .[]' 2>/dev/null); then
+          if timeline_json=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/timeline" --paginate --jq '
+            [.[] | select(.event == "connected") | .source.issue.number // empty] as $conn |
+            [.[] | select(.event == "disconnected") | .source.issue.number // empty] as $disc |
+            [$conn[] | select(. as $n | $disc | index($n) | not)] | unique | .[]' 2>/dev/null); then
             if [ -n "$timeline_json" ]; then
               sidebar_linked=true
               for num in $timeline_json; do
