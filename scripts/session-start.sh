@@ -445,8 +445,10 @@ if [ -d "$CACHE_DIR" ]; then
 fi
 
 # --- Auto-sync stale marketplace checkout ---
+# Skip entirely when on the next channel — next installs bypass the marketplace,
+# so comparing marketplace (main) vs cache (next) would cause false-positive staleness.
 _CACHE_LATEST=$(ls -d "$CACHE_DIR"/*/ 2>/dev/null | sort -V | tail -1)
-if [ -d "$MKT_DIR/.git" ] && [ -d "$CACHE_DIR" ]; then
+if [ "$VBW_CHANNEL" != "next" ] && [ -d "$MKT_DIR/.git" ] && [ -d "$CACHE_DIR" ]; then
   # Skip version-driven sync when latest cache entry is a local dev symlink —
   # local repo version differences should not drive marketplace checkout behavior.
   if [ -n "$_CACHE_LATEST" ] && [ ! -L "${_CACHE_LATEST%/}" ]; then

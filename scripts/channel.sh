@@ -50,4 +50,5 @@ vbw_github_branch() {
   esac
 }
 
-export VBW_CHANNEL VBW_CHANNEL_FILE
+# No export — callers source this file, so variables are available in their scope.
+# Avoid leaking into child processes unnecessarily.

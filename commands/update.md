@@ -40,6 +40,7 @@ Store as `old_version`. If empty, fall back to ``!`echo /tmp/.vbw-plugin-root-li
 Read the current channel from Context above. Store as `channel` (`stable` or `next`).
 
 **Flag handling** (check `$ARGUMENTS`):
+- If contains BOTH `--next` and `--stable`: STOP with error "⚠ Cannot use --next and --stable together."
 - If contains `--next`: set `channel=next` (marker will be written AFTER successful install in Step 5)
 - If contains `--stable`: set `channel=stable` (marker will be written AFTER successful install in Step 5)
 - If contains `--check`: display version banner with installed version, current channel, and STOP
@@ -84,9 +85,9 @@ Try in order (stop at first success):
 - **B) Reinstall:** `unset CLAUDECODE && claude plugin uninstall vbw@vbw-marketplace 2>&1 && unset CLAUDECODE && claude plugin install vbw@vbw-marketplace 2>&1`
 - **C) Manual fallback:** display commands for user to run manually, STOP.
 
-On success, write channel marker:
+On success, write channel marker directly (do NOT source via symlink — it may be dangling after cache nuke):
 ```bash
-bash -c '. "`!`echo /tmp/.vbw-plugin-root-link-${CLAUDE_SESSION_ID:-default}`/scripts/channel.sh" && vbw_set_channel stable'
+_CF=""; for _d in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.config/claude-code" "$HOME/.claude"; do [ -z "$_d" ] && continue; [ -d "$_d" ] && _CF="$_d/plugins/cache/vbw-marketplace/.channel" && break; done; [ -n "$_CF" ] && mkdir -p "$(dirname "$_CF")" 2>/dev/null && printf 'stable\n' > "$_CF"
 ```
 
 #### Step 5b: Next channel (git-based)
@@ -124,9 +125,9 @@ DEST="$CLAUDE_DIR/plugins/cache/vbw-marketplace/vbw/${next_version}"
 cp -R "$TMPDIR/vbw" "$DEST" && rm -rf "$DEST/.git" && rm -rf "$TMPDIR"
 ```
 
-Write channel marker:
+Write channel marker directly:
 ```bash
-bash -c '. "'$DEST'/scripts/channel.sh" && vbw_set_channel next'
+_CF=""; for _d in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.config/claude-code" "$HOME/.claude"; do [ -z "$_d" ] && continue; [ -d "$_d" ] && _CF="$_d/plugins/cache/vbw-marketplace/.channel" && break; done; [ -n "$_CF" ] && mkdir -p "$(dirname "$_CF")" 2>/dev/null && printf 'next\n' > "$_CF"
 ```
 
 **Clean stale global commands** (after stable or next install succeeds):
