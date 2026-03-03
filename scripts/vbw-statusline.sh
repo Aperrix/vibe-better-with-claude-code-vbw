@@ -488,7 +488,7 @@ L3="$USAGE_LINE"
 L4="Model: ${D}${MODEL}${X} ${D}│${X} Time: ${DUR_FMT} (API: ${API_DUR_FMT})"
 [ -n "$AGENT_LINE" ] && L4="$L4 ${D}│${X} ${AGENT_LINE}"
 _CH_BADGE=""
-[ "$_VBW_CHANNEL" = "next" ] && _CH_BADGE=" ${Y}[next]${X}"
+[ "$_VBW_CHANNEL" = "next" ] && _CH_BADGE=" [next]"
 if [ -n "$UPDATE_AVAIL" ]; then
   L4="$L4 ${D}│${X} ${Y}${B}VBW ${_VER:-?}${_CH_BADGE} → ${UPDATE_AVAIL}${X} ${Y}/vbw:update${X} ${D}│${X} ${D}CC ${VER}${X}"
 else

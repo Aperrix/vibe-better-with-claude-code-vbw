@@ -122,7 +122,7 @@ Store as `next_version`.
 Copy to cache:
 ```bash
 DEST="$CLAUDE_DIR/plugins/cache/vbw-marketplace/vbw/${next_version}"
-cp -R "$TMPDIR/vbw" "$DEST" && rm -rf "$DEST/.git" && rm -rf "$TMPDIR"
+mkdir -p "$(dirname "$DEST")" && cp -R "$TMPDIR/vbw" "$DEST" && rm -rf "$DEST/.git" && rm -rf "$TMPDIR"
 ```
 
 Write channel marker directly:

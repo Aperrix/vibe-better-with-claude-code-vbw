@@ -79,7 +79,7 @@ PASS if alive or not in tmux. WARN if dead watchdog in tmux.
 ### 16. Update channel
 Read the channel marker file:
 ```bash
-_found=false; for _d in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.config/claude-code" "$HOME/.claude"; do [ -z "$_d" ] && continue; if [ -f "$_d/plugins/cache/vbw-marketplace/.channel" ]; then cat "$_d/plugins/cache/vbw-marketplace/.channel" 2>/dev/null; _found=true; break; fi; done; [ "$_found" = false ] && echo "stable"
+_ch="stable"; for _d in "${CLAUDE_CONFIG_DIR:-}" "$HOME/.config/claude-code" "$HOME/.claude"; do [ -z "$_d" ] && continue; if [ -f "$_d/plugins/cache/vbw-marketplace/.channel" ]; then _v=$(cat "$_d/plugins/cache/vbw-marketplace/.channel" 2>/dev/null | tr -d '[:space:]'); case "$_v" in next) _ch="next";; esac; break; fi; done; echo "$_ch"
 ```
 PASS with detail: `stable` (default if file missing or empty) or `next`. Always passes — this is informational.
 
