@@ -77,6 +77,7 @@ EOF
     '.contracts/'
     '.locks/'
     '.token-state/'
+    '.vbw-context'
     '.vbw-session'
     '.active-agent'
     '.active-agent-count'
@@ -129,6 +130,7 @@ EOF
 
   # Create transient runtime files that should be excluded
   echo "12345" > .vbw-planning/.agent-pids
+  echo "1" > .vbw-planning/.vbw-context
   echo "session-abc" > .vbw-planning/.vbw-session
   echo "lead" > .vbw-planning/.active-agent
   echo "migrated" > .vbw-planning/.claude-md-migrated
@@ -154,6 +156,7 @@ EOF
   # Transient files should NOT be committed
   transient_paths=(
     '.agent-pids'
+    '.vbw-context'
     '.vbw-session'
     '.active-agent'
     '.claude-md-migrated'

@@ -68,7 +68,8 @@ is_archive_vibe_prompt() {
 }
 
 # VBW context marker: signal statusline that VBW context is active in this session.
-# Created on any VBW command; cleared by session-start.sh at next session start.
+# Created on any VBW command; cleared by session-start.sh (new session) and
+# post-compact.sh (compaction degrades context reliability).
 if echo "$PROMPT" | grep -qi '^/vbw:' || is_expanded_vbw_prompt "$PROMPT"; then
   echo "1" > "$PLANNING_DIR/.vbw-context" 2>/dev/null || true
 fi
