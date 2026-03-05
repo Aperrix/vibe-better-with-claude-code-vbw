@@ -183,7 +183,7 @@ Run the teardown script from the VBW clone:
 bash scripts/dev-setup.sh --teardown
 ```
 
-This removes the symlink, clears the command cache, and removes the VBW pre-push hook. Follow the printed instructions to reinstall from the marketplace.
+This removes the symlink, clears the command cache, removes the VBW pre-push hook, and uninstalls the `claude-vbw` launcher if present. Follow the printed instructions to reinstall from the marketplace.
 
 ## Version Management
 
