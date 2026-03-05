@@ -10,19 +10,17 @@ Thanks for considering a contribution. VBW is a Claude Code plugin, so the conve
 
 ## Local Development
 
-Clone the repo:
+Clone the repo and run the setup script:
 
 ```bash
 git clone https://github.com/yidakee/vibe-better-with-claude-code-vbw.git
+cd vibe-better-with-claude-code-vbw
+bash scripts/dev-setup.sh
 ```
 
 ### Quick setup
 
-A single script handles the full local dev setup — symlink, cache cleanup, and git hooks:
-
-```bash
-bash scripts/dev-setup.sh
-```
+The setup script handles symlink, cache cleanup, and git hooks in one step.
 
 This is compatible with both Linux and macOS.
 
