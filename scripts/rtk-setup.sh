@@ -307,6 +307,6 @@ case "$MODE" in
     echo ""
     info "━━━ Final Status ━━━"
     echo ""
-    check_status
+    check_status || true
     ;;
 esac
