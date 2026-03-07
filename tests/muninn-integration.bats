@@ -432,3 +432,26 @@ EOF
   grep -q "Decision" "$PROJECT_ROOT/references/muninn-types.md"
   grep -q "Task" "$PROJECT_ROOT/references/muninn-types.md"
 }
+
+# ============================================================
+# P1-2: Phase-end consolidation scoping
+# ============================================================
+
+@test "execute-protocol phase-end consolidation collects engram IDs" {
+  grep -q "muninn_activate" "$PROJECT_ROOT/references/execute-protocol.md"
+  grep -q "engram_ids" "$PROJECT_ROOT/references/execute-protocol.md"
+  grep -q "score > 0.3" "$PROJECT_ROOT/references/execute-protocol.md"
+}
+
+# ============================================================
+# P1-5: MuninnDB in discuss mode
+# ============================================================
+
+@test "discussion-engine recalls prior decisions via MuninnDB" {
+  grep -q "muninn_activate" "$PROJECT_ROOT/references/discussion-engine.md"
+  grep -q "muninn_guide" "$PROJECT_ROOT/references/discussion-engine.md"
+}
+
+@test "discussion-engine stores decisions via muninn_decide" {
+  grep -q "muninn_decide" "$PROJECT_ROOT/references/discussion-engine.md"
+}

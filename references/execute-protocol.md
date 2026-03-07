@@ -559,7 +559,12 @@ When `worktree_isolation="off"`: skip this block silently.
 
 **Control Plane cleanup:** Lock and token state cleanup already handled by existing Lease Lock and Token Budget cleanup blocks.
 
-**MuninnDB Consolidation (MANDATORY):** At phase end, call `muninn_consolidate(vault from .vbw-planning/config.json muninndb_vault)` to strengthen key learnings before the next phase. If the call fails, display "⚠ MuninnDB consolidation failed — verify MuninnDB is running (`muninn status`)" and continue with phase completion. Do NOT silently skip consolidation.
+**MuninnDB Consolidation (MANDATORY):** At phase end, consolidate this phase's engrams:
+1. Read `muninndb_vault` from `.vbw-planning/config.json`.
+2. Call `muninn_activate(vault: {vault}, context: "phase {N} {phase goal}", limit: 50)` to retrieve phase-relevant engrams.
+3. From the results, collect IDs of engrams with score > 0.3.
+4. Call `muninn_consolidate(vault: {vault}, engram_ids: [{collected IDs}])` to merge related engrams into consolidated memories.
+If any call fails, display "⚠ MuninnDB consolidation failed — verify MuninnDB is running (`muninn status`)" and continue with phase completion. Do NOT silently skip consolidation.
 
 **Event Log — phase end (REQ-16, graduated, always-on):**
 - `bash "${VBW_PLUGIN_ROOT}/scripts/log-event.sh" phase_end {phase} plans_completed={N} total_tasks={N} 2>/dev/null || true`
