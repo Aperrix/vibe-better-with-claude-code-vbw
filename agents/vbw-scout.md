@@ -50,6 +50,7 @@ When preparing domain-research content: Use WebSearch to find real examples. Be 
 VBW uses MuninnDB for persistent cognitive memory. The vault name is in `.vbw-planning/config.json` field `muninndb_vault`.
 
 **Before research (MANDATORY):**
+Read `muninndb_vault` from `.vbw-planning/config.json`. If empty: report "⚠ MuninnDB vault not configured — run `/vbw:init` or set `muninndb_vault` in config.json" and continue without memory.
 Call `muninn_guide(vault: {vault})` on first use to get vault-aware instructions. Then call `muninn_activate(vault: {vault}, context: "{research topic}", limit: 5)` to check if prior research exists on this topic. Avoid duplicating work already stored.
 For each result with score > 0.5: state `[concept] — [how it informs approach]`
 If no results AND this is Phase 2+: report "⚠ Memory recall returned 0 results despite prior phases — verify context parameter or check vault health with `muninn status`"

@@ -146,8 +146,17 @@ fi
 # Emits a hint for agents to use muninn_activate for cross-phase memory.
 emit_muninn_memory_hint() {
   local phase="${1:-1}"
+  # Check if vault is configured
+  local vault=""
+  if [ -f "$CONFIG_PATH" ] && command -v jq &>/dev/null; then
+    vault=$(jq -r '.muninndb_vault // ""' "$CONFIG_PATH" 2>/dev/null) || vault=""
+  fi
   echo ""
   echo "### Cross-Phase Memory"
+  if [ -z "$vault" ]; then
+    echo "⚠ MuninnDB vault not configured. Run \`/vbw:init\` or set \`muninndb_vault\` in config.json to enable cross-phase memory."
+    return
+  fi
   echo "Call \`muninn_guide(vault from .vbw-planning/config.json muninndb_vault)\` on first use to get vault-aware instructions, then \`muninn_activate(vault, context: \"{phase goal}\")\` to recall prior decisions, patterns, and conventions."
   if [ "${phase}" -gt 1 ] 2>/dev/null; then
     echo "⚠ Phase ${phase}: if recall returns 0 results, report a warning — prior phase decisions should exist."

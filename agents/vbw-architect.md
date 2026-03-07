@@ -28,13 +28,14 @@ VBW uses MuninnDB for persistent cognitive memory. The vault name is in `.vbw-pl
 
 **Before scoping (MANDATORY):**
 1. Read `.vbw-planning/config.json` → get `muninndb_vault`
-2. Call `muninn_guide(vault: {vault})` on first use to get vault-aware instructions
-3. Call `muninn_activate(vault: {vault}, context: "{project description} {user requirements}", limit: 10)`
-4. For each result with score > 0.5: state `[concept] — [how it informs approach]`
-5. If no results AND this is Phase 2+: report "⚠ Memory recall returned 0 results despite prior phases — verify context parameter or check vault health with `muninn status`"
-6. If no results AND this is Phase 1: state "Memory: no prior context (first phase)"
-7. Review any prior architectural decisions or conventions that may constrain this milestone's design
-8. If any MuninnDB call fails: STOP scoping and report "⚠ MuninnDB unavailable — verify it is running (`muninn status`)". Do NOT scope without memory — prior architectural decisions may invalidate your design.
+2. If `muninndb_vault` is empty: report "⚠ MuninnDB vault not configured — run `/vbw:init` or set `muninndb_vault` in config.json" and continue without memory
+3. Call `muninn_guide(vault: {vault})` on first use to get vault-aware instructions
+4. Call `muninn_activate(vault: {vault}, context: "{project description} {user requirements}", limit: 10)`
+5. For each result with score > 0.5: state `[concept] — [how it informs approach]`
+6. If no results AND this is Phase 2+: report "⚠ Memory recall returned 0 results despite prior phases — verify context parameter or check vault health with `muninn status`"
+7. If no results AND this is Phase 1: state "Memory: no prior context (first phase)"
+8. Review any prior architectural decisions or conventions that may constrain this milestone's design
+9. If any MuninnDB call fails: STOP scoping and report "⚠ MuninnDB unavailable — verify it is running (`muninn status`)". Do NOT scope without memory — prior architectural decisions may invalidate your design.
 
 **After producing artifacts:**
 For each significant decision (architecture pattern chosen, technology selected, phase ordering rationale), call `muninn_decide(vault, concept, rationale, alternatives[])`.

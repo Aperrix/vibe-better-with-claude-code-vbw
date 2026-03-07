@@ -271,3 +271,42 @@ EOF
 @test "SUMMARY.md template has memory_recalled field" {
   grep -q "memory_recalled" "$PROJECT_ROOT/templates/SUMMARY.md"
 }
+
+# ============================================================
+# P0 guardrails
+# ============================================================
+
+@test "debugger agent stores findings after fixing" {
+  grep -q "muninn_remember" "$PROJECT_ROOT/agents/vbw-debugger.md"
+}
+
+@test "compaction instructions include muninn_guide for all roles" {
+  for role in scout dev qa lead architect debugger docs; do
+    grep -q "muninn_guide" "$SCRIPTS_DIR/compaction-instructions.sh" || {
+      echo "muninn_guide missing from compaction-instructions.sh"; return 1
+    }
+  done
+}
+
+@test "post-compact.sh includes muninn_guide" {
+  grep -q "muninn_guide" "$SCRIPTS_DIR/post-compact.sh"
+}
+
+@test "all agents handle empty vault name" {
+  for agent in vbw-dev vbw-lead vbw-scout vbw-debugger vbw-architect vbw-docs vbw-qa; do
+    local agent_file="$PROJECT_ROOT/agents/${agent}.md"
+    grep -q "vault not configured" "$agent_file" || {
+      echo "NO empty vault guard: $agent"; return 1
+    }
+  done
+}
+
+@test "compile-context.sh warns when vault is empty" {
+  cd "$TEST_TEMP_DIR"
+  # Override config with empty vault
+  jq '.muninndb_vault = ""' "$TEST_TEMP_DIR/.vbw-planning/config.json" > "$TEST_TEMP_DIR/.vbw-planning/config.tmp" \
+    && mv "$TEST_TEMP_DIR/.vbw-planning/config.tmp" "$TEST_TEMP_DIR/.vbw-planning/config.json"
+  run bash "$SCRIPTS_DIR/compile-context.sh" 01 lead ".vbw-planning/phases"
+  [ "$status" -eq 0 ]
+  grep -q "vault not configured" ".vbw-planning/phases/01-test-phase/.context-lead.md"
+}

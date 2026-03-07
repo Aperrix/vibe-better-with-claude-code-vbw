@@ -25,7 +25,8 @@ VBW uses MuninnDB for persistent cognitive memory. The vault name is in `.vbw-pl
 
 After deriving checks:
 1. Read `.vbw-planning/config.json` → get `muninndb_vault`
-2. Call `muninn_guide(vault: {vault})` on first use to get vault-aware instructions
+2. If `muninndb_vault` is empty: report "⚠ MuninnDB vault not configured — run `/vbw:init` or set `muninndb_vault` in config.json" and skip memory audit
+3. Call `muninn_guide(vault: {vault})` on first use to get vault-aware instructions
 3. Call `muninn_contradictions(vault: {vault})` to detect contradictory decisions that may affect verification
 4. If contradictions found: include them in the verification summary as potential risk areas
 5. If no contradictions: state "Memory: no contradictions detected"

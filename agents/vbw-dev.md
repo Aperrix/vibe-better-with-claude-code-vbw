@@ -21,12 +21,13 @@ VBW uses MuninnDB for persistent cognitive memory. The vault name is in `.vbw-pl
 
 **Before Task 1 (MANDATORY):**
 1. Read `.vbw-planning/config.json` → get `muninndb_vault`
-2. Call `muninn_guide(vault: {vault})` on first use to get vault-aware instructions
-3. Call `muninn_activate(vault: {vault}, context: "{plan objective} {task descriptions}", limit: 10)`
-4. For each result with score > 0.5: state `[concept] — [how it informs approach]`
-5. If no results AND this is Phase 2+: report "⚠ Memory recall returned 0 results despite prior phases — verify context parameter or check vault health with `muninn status`"
-6. If no results AND this is Phase 1: state "Memory: no prior context (first phase)"
-7. If any MuninnDB call fails: report "⚠ MuninnDB unavailable — verify it is running (`muninn status`)" and send a `blocker_report` to Lead. Do NOT proceed without memory — past decisions may contradict your default approach.
+2. If `muninndb_vault` is empty: report "⚠ MuninnDB vault not configured — run `/vbw:init` or set `muninndb_vault` in config.json" and continue without memory
+3. Call `muninn_guide(vault: {vault})` on first use to get vault-aware instructions
+4. Call `muninn_activate(vault: {vault}, context: "{plan objective} {task descriptions}", limit: 10)`
+5. For each result with score > 0.5: state `[concept] — [how it informs approach]`
+6. If no results AND this is Phase 2+: report "⚠ Memory recall returned 0 results despite prior phases — verify context parameter or check vault health with `muninn status`"
+7. If no results AND this is Phase 1: state "Memory: no prior context (first phase)"
+8. If any MuninnDB call fails: report "⚠ MuninnDB unavailable — verify it is running (`muninn status`)" and send a `blocker_report` to Lead. Do NOT proceed without memory — past decisions may contradict your default approach.
 
 **After each task commit:**
 Store if applicable (skip if trivial):

@@ -149,7 +149,7 @@ if [ -n "$ROLE" ] && [ "$ROLE" != "unknown" ]; then
   TASK_HINT=" If you are a teammate, call TaskGet for your assigned task ID to restore your current objective."
 fi
 
-MUNINN_HINT=" After re-reading files, call muninn_activate with your current task context to recover cognitive memory from MuninnDB (prior decisions, patterns, conventions). Read muninndb_vault from .vbw-planning/config.json."
+MUNINN_HINT=" After re-reading files, read muninndb_vault from .vbw-planning/config.json, call muninn_guide(vault) for vault-aware instructions, then call muninn_activate(vault, context: your current task context) to recover cognitive memory from MuninnDB (prior decisions, patterns, conventions)."
 
 jq -n --arg role "${ROLE:-unknown}" --arg files "$FILES" --arg snap "${SNAPSHOT_CONTEXT:-}" --arg taskhint "${TASK_HINT:-}" --arg worktree "${WORKTREE_CONTEXT:-}" --arg muninn "$MUNINN_HINT" '{
   "hookSpecificOutput": {
