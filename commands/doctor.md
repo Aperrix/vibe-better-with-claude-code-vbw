@@ -14,37 +14,40 @@ Working directory:
 ```
 !`pwd`
 ```
-Version: `!`cat VERSION 2>/dev/null || echo "none"``
+Plugin root: `!`echo ${CLAUDE_PLUGIN_ROOT:-unknown}``
+Version: `!`cat ${CLAUDE_PLUGIN_ROOT}/VERSION 2>/dev/null || echo "none"``
 
 ## Checks
 
 Run ALL checks below. For each, report PASS or FAIL with a one-line detail.
+
+**Note:** Checks 2-3, 5-6, 8, 11-14 resolve plugin-owned files from `$CLAUDE_PLUGIN_ROOT`, not the project working directory.
 
 ### 1. jq installed
 `jq --version 2>/dev/null || echo "MISSING"`
 FAIL if missing: "Install jq: brew install jq (macOS) or apt install jq (Linux)"
 
 ### 2. VERSION file exists
-Check `VERSION` in repo root. FAIL if missing.
+Check `${CLAUDE_PLUGIN_ROOT}/VERSION`. FAIL if missing.
 
 ### 3. Version sync
-`bash scripts/bump-version.sh --verify 2>&1`
+`bash ${CLAUDE_PLUGIN_ROOT}/scripts/bump-version.sh --verify 2>&1`
 FAIL if mismatch detected.
 
 ### 4. Plugin cache present
 Check `${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/cache/vbw-marketplace/vbw/` exists and has at least one version directory. FAIL if empty or missing.
 
 ### 5. hooks.json valid
-Parse `hooks/hooks.json` with `jq empty`. FAIL if parse error.
+Parse `${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` with `jq empty`. FAIL if parse error.
 
 ### 6. Agent files present
-Glob `agents/vbw-*.md`. Expect 7 files (lead, dev, qa, scout, debugger, architect, docs). FAIL if any missing.
+Glob `${CLAUDE_PLUGIN_ROOT}/agents/vbw-*.md`. Expect 7 files (lead, dev, qa, scout, debugger, architect, docs). FAIL if any missing.
 
 ### 7. Config valid (project only)
 If `.vbw-planning/config.json` exists, parse with `jq empty`. FAIL if parse error. SKIP if no project initialized.
 
 ### 8. Scripts executable
-Check all `scripts/*.sh` files. WARN if any lack execute permission.
+Check all `${CLAUDE_PLUGIN_ROOT}/scripts/*.sh` files. WARN if any lack execute permission.
 
 ### 9. gh CLI available
 `gh --version 2>/dev/null || echo "MISSING"`
@@ -57,7 +60,7 @@ PASS if result is "1.0.10". WARN if sort -V unavailable (fallback will be used).
 ### Runtime Health
 
 ### 11. Stale teams
-Run `bash scripts/doctor-cleanup.sh scan 2>/dev/null` and count lines starting with `stale_team|`.
+Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/doctor-cleanup.sh scan 2>/dev/null` and count lines starting with `stale_team|`.
 PASS if 0. WARN if any, show count.
 
 ### 12. Orphaned processes
@@ -109,6 +112,6 @@ If any WARN from checks 11-14:
 - Display: "Run `/vbw:doctor --cleanup` to apply cleanup"
 
 If user invoked with `--cleanup` (check for this in the command arguments):
-- Run `bash scripts/doctor-cleanup.sh cleanup 2>&1`
+- Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/doctor-cleanup.sh cleanup 2>&1`
 - Report what was cleaned
 - Show updated counts
